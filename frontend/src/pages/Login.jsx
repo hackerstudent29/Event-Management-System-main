@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { useGoogleLogin } from "@react-oauth/google";
 import { useNavigate, Link } from "react-router-dom";
@@ -167,6 +168,7 @@ export default function Login() {
     const [isTyping, setIsTyping] = useState(false);
     const [isLookingAtEachOther, setIsLookingAtEachOther] = useState(false);
     const [isPurplePeeking, setIsPurplePeeking] = useState(false);
+    const [serverStatus, setServerStatus] = useState('checking'); // checking, online, offline
 
     const purpleRef = useRef(null);
     const blackRef = useRef(null);
@@ -184,6 +186,21 @@ export default function Login() {
 
         window.addEventListener("mousemove", handleMouseMove);
         return () => window.removeEventListener("mousemove", handleMouseMove);
+    }, []);
+
+    useEffect(() => {
+        // Ping server to check status
+        const checkServer = async () => {
+            const start = Date.now();
+            try {
+                await api.get('/bookings/ping');
+                setServerStatus('online');
+            } catch (e) {
+                console.error("Server ping failed", e);
+                setServerStatus('offline');
+            }
+        };
+        checkServer();
     }, []);
 
     useEffect(() => {
