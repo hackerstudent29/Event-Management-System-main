@@ -138,7 +138,7 @@ const TicketPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 pt-20 pb-8 px-4 print:bg-white print:p-0">
+        <div className="min-h-screen bg-slate-50 pt-20 pb-24 md:pb-8 px-4 print:bg-white print:p-0">
             {/* Top Bar - Hidden on Print */}
             <div className="max-w-[210mm] mx-auto mb-4 flex flex-col md:flex-row justify-between items-center gap-6 print:hidden bg-white/80 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-slate-200">
                 <button
