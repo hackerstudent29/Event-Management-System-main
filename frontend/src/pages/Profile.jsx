@@ -25,6 +25,38 @@ const Profile = () => {
         confirmPassword: ''
     });
 
+    const [preferences, setPreferences] = useState({
+        bookingConfirmations: true,
+        eventReminders: true,
+        cancellationUpdates: true,
+        promotionalEmails: false
+    });
+
+    useEffect(() => {
+        const fetchPreferences = async () => {
+            try {
+                const res = await api.get('/user/preferences');
+                setPreferences(res.data);
+            } catch (error) {
+                console.error('Failed to fetch preferences');
+            }
+        };
+        if (user) fetchPreferences();
+    }, [user]);
+
+    const handlePreferenceToggle = async (key) => {
+        const newPreferences = { ...preferences, [key]: !preferences[key] };
+        setPreferences(newPreferences);
+
+        try {
+            await api.put('/user/preferences', newPreferences);
+        } catch (error) {
+            // Revert on error
+            setPreferences(preferences);
+            alert('Failed to update preferences');
+        }
+    };
+
     const handleUpdateProfile = async () => {
         setLoading(true);
         try {
@@ -160,6 +192,80 @@ const Profile = () => {
                             </Button>
                         </div>
                     )}
+                </div>
+
+                {/* Notification Preferences */}
+                <div className="bg-white rounded-2xl p-6 border border-slate-200">
+                    <h3 className="text-base font-bold text-slate-900 mb-4">Communication Preferences</h3>
+                    <div className="space-y-4">
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-slate-900">Booking Confirmations</p>
+                                <p className="text-xs text-slate-500 mt-0.5">Get SMS & Email when you book an event</p>
+                            </div>
+                            <button
+                                onClick={() => handlePreferenceToggle('bookingConfirmations')}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${preferences.bookingConfirmations ? 'bg-slate-900' : 'bg-slate-200'
+                                    }`}
+                            >
+                                <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${preferences.bookingConfirmations ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                />
+                            </button>
+                        </div>
+
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-slate-900">Event Reminders</p>
+                                <p className="text-xs text-slate-500 mt-0.5">Receive alerts 24h before your event starts</p>
+                            </div>
+                            <button
+                                onClick={() => handlePreferenceToggle('eventReminders')}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${preferences.eventReminders ? 'bg-slate-900' : 'bg-slate-200'
+                                    }`}
+                            >
+                                <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${preferences.eventReminders ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                />
+                            </button>
+                        </div>
+
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-slate-900">Cancellation Updates</p>
+                                <p className="text-xs text-slate-500 mt-0.5">Immediate alerts if an event is postponed or cancelled</p>
+                            </div>
+                            <button
+                                onClick={() => handlePreferenceToggle('cancellationUpdates')}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${preferences.cancellationUpdates ? 'bg-slate-900' : 'bg-slate-200'
+                                    }`}
+                            >
+                                <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${preferences.cancellationUpdates ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                />
+                            </button>
+                        </div>
+
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-slate-900">Promotional Emails</p>
+                                <p className="text-xs text-slate-500 mt-0.5">New events, discounts and curated recommendations</p>
+                            </div>
+                            <button
+                                onClick={() => handlePreferenceToggle('promotionalEmails')}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${preferences.promotionalEmails ? 'bg-slate-900' : 'bg-slate-200'
+                                    }`}
+                            >
+                                <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${preferences.promotionalEmails ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                />
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Actions */}

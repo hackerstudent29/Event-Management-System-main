@@ -124,4 +124,28 @@ public class Dtos {
             this.userName = userName;
         }
     }
+
+    @Data
+    public static class UserPreferencesRequest {
+        private Boolean bookingConfirmations;
+        private Boolean eventReminders;
+        private Boolean cancellationUpdates;
+        private Boolean promotionalEmails;
+    }
+
+    @Data
+    public static class UserPreferencesResponse {
+        private Boolean bookingConfirmations;
+        private Boolean eventReminders;
+        private Boolean cancellationUpdates;
+        private Boolean promotionalEmails;
+
+        public UserPreferencesResponse(Boolean bookingConfirmations, Boolean eventReminders,
+                Boolean cancellationUpdates, Boolean promotionalEmails) {
+            this.bookingConfirmations = bookingConfirmations;
+            this.eventReminders = eventReminders;
+            this.cancellationUpdates = cancellationUpdates;
+            this.promotionalEmails = promotionalEmails;
+        }
+    }
 }
