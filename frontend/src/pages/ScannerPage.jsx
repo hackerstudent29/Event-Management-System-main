@@ -13,12 +13,26 @@ const ScannerPage = () => {
     const handleScan = async (data) => {
         if (!data || loading) return;
 
-        // Extract bookingId from URL: https://domain/verify/uuid
+        // Extract bookingId from QR code format: BOOKING-{uuid}-{status}
         const text = data[0]?.rawValue;
         if (!text) return;
 
-        const parts = text.split('/');
-        const bookingId = parts[parts.length - 1];
+        // Parse format: BOOKING-da2612d1-298b-4c28-a096-82f60bb883c3-PENDING
+        let bookingId;
+        if (text.startsWith('BOOKING-')) {
+            const parts = text.split('-');
+            // UUID is parts[1] through parts[5] (5 segments of UUID)
+            if (parts.length >= 6) {
+                bookingId = parts.slice(1, 6).join('-');
+            }
+        } else if (text.includes('/')) {
+            // Fallback: URL format like https://domain/verify/uuid
+            const parts = text.split('/');
+            bookingId = parts[parts.length - 1];
+        } else {
+            // Assume it's just the UUID
+            bookingId = text;
+        }
 
         if (!bookingId || bookingId.length < 32) return; // Basic UUID check
 
