@@ -746,7 +746,7 @@ const EventDetail = () => {
 
             {/* 4. Floating Checkout Dock */}
             <div className={cn(
-                "fixed bottom-6 left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-2xl bg-slate-900/90 backdrop-blur-md text-white shadow-2xl rounded-2xl p-1 z-50 transition-all duration-500 border border-white/10",
+                "fixed bottom-20 md:bottom-6 left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-2xl bg-slate-900/90 backdrop-blur-md text-white shadow-2xl rounded-2xl p-1 z-40 transition-all duration-500 border border-white/10",
                 selectedSeatIds.length > 0 ? "translate-y-0 opacity-100" : "translate-y-[150%] opacity-0"
             )}>
                 <div className="flex items-center justify-between pl-6 pr-2 py-2">
