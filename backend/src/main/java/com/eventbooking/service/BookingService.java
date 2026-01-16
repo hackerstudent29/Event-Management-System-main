@@ -103,7 +103,8 @@ public class BookingService {
         hold.setUserId(request.getUserId());
         hold.setEventCategoryId(request.getEventCategoryId());
         hold.setSeatIdentifiers(String.join(", ", request.getSeatIds()));
-        com.eventbooking.model.EventCategory category = eventCategoryRepository.findById(request.getEventCategoryId())
+        com.eventbooking.model.EventCategory category = eventCategoryRepository
+                .findById(Objects.requireNonNull(request.getEventCategoryId()))
                 .orElseThrow(() -> new RuntimeException("Category not found"));
         if (category.getEvent().getEventDate().isBefore(java.time.LocalDateTime.now())) {
             throw new RuntimeException("Cannot hold seats for a past event.");
