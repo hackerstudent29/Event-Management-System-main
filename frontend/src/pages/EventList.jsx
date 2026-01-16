@@ -97,10 +97,10 @@ const EventList = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
-            {/* Mobile-First Top Bar */}
+            {/* Top Bar - Responsive */}
             <header className="bg-white sticky top-0 z-50 border-b border-slate-100">
-                <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-                    <h1 className="text-lg font-bold text-slate-900">Events</h1>
+                <div className="max-w-7xl mx-auto px-4 md:px-6 h-14 md:h-16 flex items-center justify-between">
+                    <h1 className="text-lg md:text-2xl font-bold text-slate-900">Events</h1>
                     <button
                         onClick={() => setShowAccountSheet(true)}
                         className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors md:hidden"
@@ -108,6 +108,23 @@ const EventList = () => {
                     >
                         <User className="w-5 h-5 text-slate-700" />
                     </button>
+                    {/* Desktop Actions */}
+                    <div className="hidden md:flex items-center gap-3">
+                        <button
+                            onClick={() => navigate('/my-bookings')}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+                        >
+                            <Ticket className="w-4 h-4" />
+                            <span className="text-sm font-medium">My Bookings</span>
+                        </button>
+                        <button
+                            onClick={() => navigate('/profile')}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+                        >
+                            <User className="w-4 h-4" />
+                            <span className="text-sm font-medium">Profile</span>
+                        </button>
+                    </div>
                 </div>
             </header>
 
