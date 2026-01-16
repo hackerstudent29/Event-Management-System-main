@@ -67,6 +67,33 @@ export const MobileBottomNav = () => {
                             </div>
                             {user ? (
                                 <>
+                                    {/* Admin Options */}
+                                    {user.role === 'ADMIN' && (
+                                        <button
+                                            onClick={() => {
+                                                setShowAccountSheet(false);
+                                                navigate('/admin');
+                                            }}
+                                            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-blue-50 transition-colors text-blue-600"
+                                        >
+                                            <User className="w-5 h-5" />
+                                            <span className="font-medium">Admin Dashboard</span>
+                                        </button>
+                                    )}
+                                    {user.email === 'ramzendrum@gmail.com' && (
+                                        <button
+                                            onClick={() => {
+                                                setShowAccountSheet(false);
+                                                navigate('/scanner');
+                                            }}
+                                            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-purple-50 transition-colors text-purple-600"
+                                        >
+                                            <Ticket className="w-5 h-5" />
+                                            <span className="font-medium">Scan Tickets</span>
+                                        </button>
+                                    )}
+
+                                    {/* Regular User Options */}
                                     <button
                                         onClick={() => {
                                             setShowAccountSheet(false);
