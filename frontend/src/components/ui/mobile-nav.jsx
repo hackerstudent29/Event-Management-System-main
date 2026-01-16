@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Calendar, Ticket, MapPin, User, LogOut, Edit, Key } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { Calendar, Ticket, MapPin, User, LogOut, Edit, Key, ChevronLeft } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export const MobileBottomNav = () => {
     const navigate = useNavigate();
