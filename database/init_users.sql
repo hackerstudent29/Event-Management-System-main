@@ -7,7 +7,7 @@
 INSERT INTO users (id, email, password, role, is_verified, created_at)
 VALUES (
     '5ae4dd4e-74d5-4032-8826-dfcabf3e3643'::uuid,
-    'ramanathanb86@gmail.com',
+    'admin@eventbooking.com',
     '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
     'ADMIN',
     true,
