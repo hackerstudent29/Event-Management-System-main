@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Navbar from './components/Navbar';
+import { AppLayout } from './components/ui/app-layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -19,12 +19,11 @@ import PublicVerifyPage from './pages/PublicVerifyPage';
 import ZendrumBooking from './pages/ZendrumBooking';
 
 import { MessageProvider } from './context/MessageContext';
-
 import ErrorBoundary from './components/ErrorBoundary';
 
 const ProtectedRoute = ({ children, role, allowEmail }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-900"></div></div>;
   if (!user) return <Navigate to="/login" />;
 
   const hasRole = !role || user.role === role;
@@ -36,7 +35,7 @@ const ProtectedRoute = ({ children, role, allowEmail }) => {
 
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-900"></div></div>;
   if (user) return <Navigate to="/" />;
   return children;
 };
@@ -44,69 +43,33 @@ const PublicRoute = ({ children }) => {
 function App() {
   return (
     <ErrorBoundary>
-
       <Router>
         <MessageProvider>
           <AuthProvider>
-            <Navbar />
             <Routes>
-              <Route path="/" element={<ProtectedRoute><EventList /></ProtectedRoute>} />
-              <Route path="/events/:id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
+              {/* Auth routes - no layout */}
               <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
               <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
               <Route path="/verify-signup-otp" element={<PublicRoute><VerifySignupOtp /></PublicRoute>} />
               <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
 
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute role="ADMIN">
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/my-bookings"
-                element={
-                  <ProtectedRoute>
-                    <MyBookings />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/order-summary"
-                element={
-                  <ProtectedRoute>
-                    <OrderSummary />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/ticket/:bookingId"
-                element={
-                  <ProtectedRoute>
-                    <TicketPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/scanner"
-                element={
-                  <ProtectedRoute role="ADMIN" allowEmail="ramzendrum@gmail.com">
-                    <ScannerPage />
-                  </ProtectedRoute>
-                }
-              />
+              {/* Public verify page - no layout */}
               <Route path="/verify/:bookingId" element={<PublicVerifyPage />} />
-              <Route path="/zendrum-booking" element={<ZendrumBooking />} />
+
+              {/* Admin routes - no bottom nav */}
+              <Route path="/admin" element={<ProtectedRoute role="ADMIN"><AdminDashboard /></ProtectedRoute>} />
+              <Route path="/scanner" element={<ProtectedRoute role="ADMIN" allowEmail="ramzendrum@gmail.com"><ScannerPage /></ProtectedRoute>} />
+
+              {/* User routes - WITH AppLayout (bottom nav) */}
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<ProtectedRoute><EventList /></ProtectedRoute>} />
+                <Route path="/events/:id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
+                <Route path="/my-bookings" element={<ProtectedRoute><MyBookings /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                <Route path="/order-summary" element={<ProtectedRoute><OrderSummary /></ProtectedRoute>} />
+                <Route path="/ticket/:bookingId" element={<ProtectedRoute><TicketPage /></ProtectedRoute>} />
+                <Route path="/zendrum-booking" element={<ZendrumBooking />} />
+              </Route>
             </Routes>
           </AuthProvider>
         </MessageProvider>
