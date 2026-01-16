@@ -3,13 +3,12 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { MobileBottomNav } from './mobile-nav';
 import Navbar from '../Navbar';
 
-// Pages that should NOT show bottom nav (auth pages, admin, etc.)
+// Pages that should NOT show bottom nav (auth pages, etc.)
 const NO_NAV_PAGES = [
     '/login',
     '/register',
     '/forgot-password',
-    '/verify-signup-otp',
-    '/admin'
+    '/verify-signup-otp'
 ];
 
 export const AppLayout = () => {
@@ -22,13 +21,13 @@ export const AppLayout = () => {
         <div className="min-h-screen bg-slate-50">
             {/* Desktop Navbar - Hidden on Mobile */}
             {!hideNav && (
-                <div className="hidden md:block sticky top-0 z-50">
+                <div className="hidden md:block">
                     <Navbar />
                 </div>
             )}
 
             {/* Main content */}
-            <main className={hideNav ? '' : 'pb-20 md:pb-0'}>
+            <main className={hideNav ? '' : 'pb-20 md:pb-0 md:pt-28'}>
                 <Outlet />
             </main>
 
