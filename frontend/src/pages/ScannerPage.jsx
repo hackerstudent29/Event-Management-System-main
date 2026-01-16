@@ -101,9 +101,9 @@ const ScannerPage = () => {
         <div className="min-h-screen bg-slate-900 flex flex-col p-6">
             <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
                 <div className="flex items-center justify-between mb-8">
-                    <button onClick={() => navigate('/admin')} className="text-white/60 hover:text-white flex items-center gap-2 text-sm font-bold">
+                    <button onClick={() => navigate('/')} className="text-white/60 hover:text-white flex items-center gap-2 text-sm font-bold">
                         <ArrowLeft className="w-4 h-4" />
-                        Dashboard
+                        Events
                     </button>
                     <span className="text-xs font-black text-white/40 uppercase tracking-widest">Admin Scanner</span>
                 </div>

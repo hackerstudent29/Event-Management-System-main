@@ -57,11 +57,12 @@ function App() {
               <Route path="/verify/:bookingId" element={<PublicVerifyPage />} />
 
               {/* Admin routes - no bottom nav */}
-              <Route path="/admin" element={<ProtectedRoute role="ADMIN"><AdminDashboard /></ProtectedRoute>} />
+
               <Route path="/scanner" element={<ProtectedRoute role="ADMIN" allowEmail="ramzendrum@gmail.com"><ScannerPage /></ProtectedRoute>} />
 
               {/* User routes - WITH AppLayout (bottom nav) */}
               <Route element={<AppLayout />}>
+                <Route path="/admin" element={<ProtectedRoute role="ADMIN"><AdminDashboard /></ProtectedRoute>} />
                 <Route path="/" element={<ProtectedRoute><EventList /></ProtectedRoute>} />
                 <Route path="/events/:id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
                 <Route path="/my-bookings" element={<ProtectedRoute><MyBookings /></ProtectedRoute>} />
