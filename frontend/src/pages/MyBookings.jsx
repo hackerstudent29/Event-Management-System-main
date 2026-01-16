@@ -133,40 +133,57 @@ const MyBookings = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
-            {/* Mobile-First Top Bar */}
+            {/* Top Bar - Responsive */}
             <header className="bg-white sticky top-0 z-50 border-b border-slate-100">
-                <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-                    <h1 className="text-lg font-bold text-slate-900">My Bookings</h1>
+                <div className="max-w-7xl mx-auto px-4 md:px-6 h-14 md:h-16 flex items-center justify-between">
+                    <h1 className="text-lg md:text-2xl font-bold text-slate-900">My Bookings</h1>
                     <button
                         onClick={() => setShowAccountSheet(true)}
-                        className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"
+                        className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors md:hidden"
                         aria-label="Account"
                     >
                         <User className="w-5 h-5 text-slate-700" />
                     </button>
+                    {/* Desktop Actions */}
+                    <div className="hidden md:flex items-center gap-3">
+                        <button
+                            onClick={() => navigate('/profile')}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+                        >
+                            <User className="w-4 h-4" />
+                            <span className="text-sm font-medium">Profile</span>
+                        </button>
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            <span className="text-sm font-medium">Sign Out</span>
+                        </button>
+                    </div>
                 </div>
             </header>
 
-            {/* Compact Stats - Mobile Optimized */}
-            <div className="max-w-4xl mx-auto px-4 py-4">
-                <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-white rounded-xl p-3 border border-slate-100">
-                        <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
-                        <div className="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">Total</div>
+            {/* Stats - Responsive */}
+            <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6">
+                <div className="grid grid-cols-3 gap-2 md:gap-4">
+                    <div className="bg-white rounded-xl p-3 md:p-6 border border-slate-100 shadow-sm">
+                        <div className="text-2xl md:text-4xl font-bold text-slate-900">{stats.total}</div>
+                        <div className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wide mt-0.5 md:mt-1">Total Bookings</div>
                     </div>
-                    <div className="bg-white rounded-xl p-3 border border-slate-100">
-                        <div className="text-2xl font-bold text-slate-900">₹{Math.round(stats.totalSpent)}</div>
-                        <div className="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">Spent</div>
+                    <div className="bg-white rounded-xl p-3 md:p-6 border border-slate-100 shadow-sm">
+                        <div className="text-2xl md:text-4xl font-bold text-slate-900">₹{Math.round(stats.totalSpent)}</div>
+                        <div className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wide mt-0.5 md:mt-1">Total Spent</div>
                     </div>
-                    <div className="bg-white rounded-xl p-3 border border-slate-100">
-                        <div className="text-2xl font-bold text-red-600">{stats.cancelled}</div>
-                        <div className="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">Cancelled</div>
+                    <div className="bg-white rounded-xl p-3 md:p-6 border border-slate-100 shadow-sm">
+                        <div className="text-2xl md:text-4xl font-bold text-red-600">{stats.cancelled}</div>
+                        <div className="text-[10px] md:text-xs text-slate-500 uppercase tracking-wide mt-0.5 md:mt-1">Cancelled</div>
                     </div>
                 </div>
             </div>
 
-            {/* Booking List - Mobile-First Cards */}
-            <main className="max-w-4xl mx-auto px-4 space-y-3">
+            {/* Booking List - Responsive */}
+            <main className="max-w-7xl mx-auto px-4 md:px-6 space-y-3 md:space-y-4">
                 {groupedBookings.length === 0 ? (
                     <div className="bg-white rounded-2xl p-8 text-center border border-slate-100 mt-4">
                         <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
