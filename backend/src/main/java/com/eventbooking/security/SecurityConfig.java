@@ -42,6 +42,7 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.GET, "/api/events/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/bookings/occupied/**").permitAll()
+                        .requestMatchers("/api/bookings/ping").permitAll()
                         // Admin endpoints matching strict requirements
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/events/**").hasRole("ADMIN")
@@ -82,8 +83,12 @@ public class SecurityConfig {
         System.out.println("[CORS] Initializing Standard CorsConfigurationSource");
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-        config.setAllowedOriginPatterns(Arrays.asList("http://localhost:3000", "http://localhost:5173",
-                "http://127.0.0.1:3000", "http://127.0.0.1:5173"));
+        config.setAllowedOriginPatterns(Arrays.asList(
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:5173",
+                "https://zendrumbooking.vercel.app"));
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
         config.addExposedHeader("Authorization");
