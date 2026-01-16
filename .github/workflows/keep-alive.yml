@@ -1,0 +1,16 @@
+name: Prevent Sleep Mode
+
+on:
+  schedule:
+    # Run every 14 minutes (Render sleeps after 15 mins)
+    - cron: '*/14 * * * *'
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Backend & Database
+        run: |
+          # Replace this URL with your actual deployment URL if different
+          curl -I https://zendrum-backend.onrender.com/api/bookings/ping || echo "Site unavailable"

@@ -66,7 +66,9 @@ public class BookingController {
 
     @GetMapping("/ping")
     public ResponseEntity<String> ping() {
-        return ResponseEntity.ok("Booking Controller Reachable");
+        // execute simple query to keep DB awake
+        long count = userRepository.count();
+        return ResponseEntity.ok("Booking Controller Reachable. Active Users: " + count);
     }
 
     @PostMapping("/{id}/email-ticket")
