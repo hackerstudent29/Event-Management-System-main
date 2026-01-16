@@ -632,6 +632,17 @@ export default function Login() {
                             Sign Up
                         </Link>
                     </div>
+                    {/* Server Status Indicator */}
+                    <div className="mt-4 flex justify-center">
+                        {serverStatus === 'checking' && <span className="text-xs text-yellow-600 animate-pulse">Connecting to server...</span>}
+                        {serverStatus === 'online' && <span className="text-xs text-green-600 flex items-center gap-1">● Server Online</span>}
+                        {serverStatus === 'offline' && (
+                            <div className="text-center">
+                                <span className="text-xs text-red-500 flex items-center gap-1 justify-center">● Server Unreachable</span>
+                                <p className="text-[10px] text-muted-foreground mt-1">Check Vercel Env Vars or wait for wake-up</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
