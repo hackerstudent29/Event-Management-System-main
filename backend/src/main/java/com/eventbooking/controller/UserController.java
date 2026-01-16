@@ -30,7 +30,8 @@ public class UserController {
         return ResponseEntity.ok(userService.updateProfile(
                 userId,
                 updates.get("name"),
-                updates.get("phoneNumber")));
+                updates.get("phoneNumber"),
+                updates.get("profileImage")));
     }
 
     @PostMapping("/profile/{userId}/password/otp")

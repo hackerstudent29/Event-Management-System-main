@@ -44,16 +44,39 @@ public class EventService {
         event.setLocationAddress(request.getLocationAddress());
         event.setLatitude(request.getLatitude());
         event.setLongitude(request.getLongitude());
+        event.setImageUrl(request.getImageUrl());
+        event.setImageAspectRatio(request.getImageAspectRatio());
+        event.setEventSubType(request.getEventSubType());
+        event.setSeatingLayoutVariant(request.getSeatingLayoutVariant());
         // No global seat count
 
         Event savedEvent = eventRepository.save(event);
 
         // If categories provided, use them; otherwise initialize defaults
         if (request.getCategories() != null && !request.getCategories().isEmpty()) {
+
+            // Count occurrences to detect duplicates
+            Map<String, Integer> nameCounts = new HashMap<>();
+            for (Dtos.CategoryRequest req : request.getCategories()) {
+                nameCounts.put(req.getCategoryName(), nameCounts.getOrDefault(req.getCategoryName(), 0) + 1);
+            }
+
             for (Dtos.CategoryRequest catReq : request.getCategories()) {
                 com.eventbooking.model.EventCategory ec = new com.eventbooking.model.EventCategory();
                 ec.setEvent(savedEvent);
-                ec.setCategoryName(catReq.getCategoryName());
+
+                String name = catReq.getCategoryName();
+                // If this name appears more than once in the request, make it unique
+                if (nameCounts.get(name) > 1) {
+                    String suffix = catReq.getArenaPosition();
+                    if (suffix != null && !suffix.isEmpty()) {
+                        name = name + " - " + suffix.replace("_", " ").toUpperCase();
+                    } else {
+                        name = name + " " + UUID.randomUUID().toString().substring(0, 4);
+                    }
+                }
+
+                ec.setCategoryName(name);
                 ec.setColor(catReq.getColor());
                 ec.setArenaPosition(catReq.getArenaPosition());
                 ec.setTotalSeats(catReq.getTotalSeats());
@@ -105,6 +128,14 @@ public class EventService {
         event.setLocationAddress(request.getLocationAddress());
         event.setLatitude(request.getLatitude());
         event.setLongitude(request.getLongitude());
+        if (request.getImageUrl() != null)
+            event.setImageUrl(request.getImageUrl());
+        if (request.getImageAspectRatio() != null)
+            event.setImageAspectRatio(request.getImageAspectRatio());
+        if (request.getEventSubType() != null)
+            event.setEventSubType(request.getEventSubType());
+        if (request.getSeatingLayoutVariant() != null)
+            event.setSeatingLayoutVariant(request.getSeatingLayoutVariant());
 
         // Handle categories
         if (request.getCategories() != null) {

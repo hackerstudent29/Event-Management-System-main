@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export function ModernTimePicker({ value, onChange }) {
+export function ModernTimePicker({ value, onChange, minTime, disabled }) {
     const [isOpen, setIsOpen] = React.useState(false);
 
     const parseTo12h = (timeStr) => {
@@ -33,8 +33,36 @@ export function ModernTimePicker({ value, onChange }) {
         setSelP(p);
     }, [value, isOpen]);
 
+    const [minH, minM] = React.useMemo(() => {
+        if (!minTime || typeof minTime !== 'string') return [0, 0];
+        const [h, m] = minTime.split(':').map(Number);
+        return [h, m];
+    }, [minTime]);
+
+    React.useEffect(() => {
+        const { h, m, p } = parseTo12h(value);
+        setSelH(h);
+        setSelM(m);
+        setSelP(p);
+    }, [value, isOpen]);
+
+    const isHourDisabled = (hStr) => {
+        if (!minTime) return false;
+        let h24 = parseInt(hStr);
+        if (selP === "PM" && h24 !== 12) h24 += 12;
+        if (selP === "AM" && h24 === 12) h24 = 0;
+        return h24 < minH;
+    };
+
+    const isPeriodDisabled = (pStr) => {
+        if (!minTime) return false;
+        // If minH is >= 12, then "AM" is fully disabled
+        if (pStr === "AM" && minH >= 12) return true;
+        return false;
+    };
+
     const hoursList = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0"));
-    const minutesList = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, "0"));
+    const minutesList = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, "0"));
     const periods = ["AM", "PM"];
 
     const hRef = React.useRef(null);
@@ -76,6 +104,13 @@ export function ModernTimePicker({ value, onChange }) {
         if (selP === "PM" && h24 !== 12) h24 += 12;
         if (selP === "AM" && h24 === 12) h24 = 0;
         const time24 = `${h24.toString().padStart(2, "0")}:${selM}`;
+
+        // Final validation before confirming
+        if (minTime && typeof minTime === 'string') {
+            const [currMinH] = minTime.split(':').map(Number);
+            if (h24 < currMinH) return; // Prevent confirming invalid time
+        }
+
         onChange(time24);
         setIsOpen(false);
     };
@@ -91,7 +126,11 @@ export function ModernTimePicker({ value, onChange }) {
                 <Button
                     type="button"
                     variant="outline"
-                    className="w-full h-11 justify-between text-left font-normal bg-slate-50 border-slate-200 hover:bg-white hover:border-primary/30 transition-all px-4 rounded-lg group shadow-sm"
+                    disabled={disabled}
+                    className={cn(
+                        "w-full h-11 justify-between text-left font-normal bg-slate-50 border-slate-200 hover:bg-white hover:border-primary/30 transition-all px-4 rounded-lg group shadow-sm",
+                        disabled && "opacity-50 cursor-not-allowed bg-slate-100"
+                    )}
                 >
                     <div className="flex items-center">
                         <Clock className="mr-2 h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
@@ -122,18 +161,23 @@ export function ModernTimePicker({ value, onChange }) {
                         onScroll={() => handleScroll(hRef, hoursList, setSelH)}
                         className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-[68px] scroll-smooth snap-y snap-mandatory"
                     >
-                        {hoursList.map(h => (
-                            <button
-                                key={h}
-                                onClick={() => scrollTo(hRef, h, hoursList)}
-                                className={cn(
-                                    "flex items-center justify-center w-full h-10 text-sm snap-center transition-all duration-200",
-                                    selH === h ? "text-primary font-semibold scale-110" : "text-slate-300 hover:text-slate-400"
-                                )}
-                            >
-                                {h}
-                            </button>
-                        ))}
+                        {hoursList.map(h => {
+                            const disabled = isHourDisabled(h);
+                            return (
+                                <button
+                                    key={h}
+                                    onClick={() => !disabled && scrollTo(hRef, h, hoursList)}
+                                    disabled={disabled}
+                                    className={cn(
+                                        "flex items-center justify-center w-full h-10 text-sm snap-center transition-all duration-200",
+                                        selH === h ? "text-primary font-semibold scale-110" : "text-slate-300 hover:text-slate-400",
+                                        disabled && "opacity-20 cursor-not-allowed pointer-events-none text-slate-200"
+                                    )}
+                                >
+                                    {h}
+                                </button>
+                            )
+                        })}
                     </div>
 
                     <div className="w-px bg-slate-50 my-6" />
@@ -166,18 +210,23 @@ export function ModernTimePicker({ value, onChange }) {
                         onScroll={() => handleScroll(pRef, periods, setSelP)}
                         className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-[68px] scroll-smooth snap-y snap-mandatory"
                     >
-                        {periods.map(p => (
-                            <button
-                                key={p}
-                                onClick={() => scrollTo(pRef, p, periods)}
-                                className={cn(
-                                    "flex items-center justify-center w-full h-10 text-xs font-semibold snap-center transition-all duration-200",
-                                    selP === p ? "text-primary scale-110" : "text-slate-300 hover:text-slate-400"
-                                )}
-                            >
-                                {p}
-                            </button>
-                        ))}
+                        {periods.map(p => {
+                            const disabled = isPeriodDisabled(p);
+                            return (
+                                <button
+                                    key={p}
+                                    onClick={() => !disabled && scrollTo(pRef, p, periods)}
+                                    disabled={disabled}
+                                    className={cn(
+                                        "flex items-center justify-center w-full h-10 text-xs font-semibold snap-center transition-all duration-200",
+                                        selP === p ? "text-primary scale-110" : "text-slate-300 hover:text-slate-400",
+                                        disabled && "opacity-20 cursor-not-allowed pointer-events-none text-slate-200"
+                                    )}
+                                >
+                                    {p}
+                                </button>
+                            )
+                        })}
                     </div>
 
                     {/* Selection Highlight */}

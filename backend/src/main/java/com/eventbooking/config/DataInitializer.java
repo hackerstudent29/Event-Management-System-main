@@ -40,7 +40,10 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         // Primary Admin
-        createOrUpdateUser("ramanathanb86@gmail.com", "ADMIN", "Admin@123");
+        createOrUpdateUser("admin@eventbooking.com", "ADMIN", "Admin@123");
+
+        // Authorized Scanner User
+        createOrUpdateUser("ramzendrum@gmail.com", "ADMIN", "Admin@123");
 
         // Backup Admin (Emergency Access)
         createOrUpdateUser("backup_admin@gmail.com", "ADMIN", "Admin@123");

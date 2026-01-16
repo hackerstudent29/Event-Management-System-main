@@ -1,6 +1,7 @@
 com\eventbooking\service\CustomUserDetailsService.class
 com\eventbooking\security\JwtAuthenticationFilter.class
 com\eventbooking\dto\OtpDtos$ResetPasswordRequest.class
+com\eventbooking\config\StorageInitializer.class
 com\eventbooking\controller\AuthController.class
 com\eventbooking\security\JwtUtil.class
 com\eventbooking\repository\EventRepository.class
@@ -10,13 +11,13 @@ com\eventbooking\repository\EventCategoryRepository.class
 com\eventbooking\dto\Dtos$ScanRequest.class
 com\eventbooking\repository\SeatHoldRepository.class
 com\eventbooking\dto\Dtos$BookingRequest.class
+com\eventbooking\service\UserService.class
 com\eventbooking\repository\EmailOtpRepository.class
 com\eventbooking\service\EmailService.class
 com\eventbooking\dto\Dtos$CancellationRequest.class
 com\eventbooking\dto\Dtos$LoginResponse.class
 com\eventbooking\service\BookingService.class
 com\eventbooking\model\EventCategory.class
-com\eventbooking\controller\AdminSetupController.class
 com\eventbooking\dto\OtpDtos$VerifyOtpRequest.class
 com\eventbooking\repository\UserRepository.class
 com\eventbooking\model\Booking.class
@@ -26,6 +27,7 @@ com\eventbooking\config\SchemaFixer.class
 com\eventbooking\dto\Dtos$DashboardStats.class
 com\eventbooking\service\OtpService.class
 com\eventbooking\controller\UserController.class
+com\eventbooking\controller\BookingController.class
 com\eventbooking\controller\EventController.class
 com\eventbooking\model\EmailOtp.class
 com\eventbooking\model\SeatHold.class
@@ -43,7 +45,6 @@ com\eventbooking\dto\OtpDtos$ForgotPasswordRequest.class
 com\eventbooking\repository\BookingRepository.class
 com\eventbooking\service\EventService.class
 com\eventbooking\controller\AuthController$1.class
-com\eventbooking\controller\AdminCheckController.class
 com\eventbooking\service\AuthService.class
 com\eventbooking\security\SecurityConfig.class
 com\eventbooking\EventBookingApplication.class

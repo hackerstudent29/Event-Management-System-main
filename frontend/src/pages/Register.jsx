@@ -8,7 +8,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Checkbox } from "../components/ui/checkbox";
 import { Eye, EyeOff, Sparkles } from "lucide-react";
-import { RiGoogleFill } from "@remixicon/react";
+
 
 // Pupil Component
 const Pupil = ({ size = 12, maxDistance = 5, pupilColor = "black", forceLookX, forceLookY }) => {
@@ -334,7 +334,7 @@ export default function Register() {
                 <div className="relative z-20 flex flex-col gap-1 text-sm text-primary-foreground/80">
                     <p className="font-semibold">Event Booking Management System</p>
                     <p className="text-primary-foreground/60">Secure and real-time event seat booking platform.</p>
-                    <p className="mt-2 text-xs text-primary-foreground/50">Contact: <a href="mailto:ramzendrum@gmail.com" className="hover:text-primary-foreground transition-colors">ramzendrum@gmail.com</a></p>
+                    <p className="mt-2 text-xs text-primary-foreground/50">Contact: <a href="mailto:support@eventbooking.com" className="hover:text-primary-foreground transition-colors">support@eventbooking.com</a></p>
                 </div>
                 {/* Decorative elements (Grid) */}
                 <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]" />
@@ -382,7 +382,9 @@ export default function Register() {
 
                     <div className="mt-6 flex flex-col gap-2">
                         <Button variant="outline" className="w-full h-12" onClick={() => googleLoginAction()}>
-                            <RiGoogleFill className="me-3 text-[#DB4437] dark:text-white/60" size={16} />
+                            <svg className="mr-3 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
+                                <path fill="#EA4335" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
+                            </svg>
                             Sign up with Google
                         </Button>
                     </div>

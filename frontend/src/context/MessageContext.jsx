@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { ToastProvider as OriginalToastProvider, useToast as useOriginalToast } from '@/components/ui/toast-1';
+import { ToastProvider as OriginalToastProvider, useToast as useOriginalToast } from '@/components/ui/toast';
 
 const MessageContext = createContext();
 

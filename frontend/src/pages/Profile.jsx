@@ -13,6 +13,19 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { LocationMap } from '@/components/ui/expand-map';
+import AvatarUpload from '@/components/ui/avatar-upload';
+import { Map, Marker } from '@/components/ui/map';
+import { Search as MapSearch } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+
 const SectionTitle = ({ children, icon: Icon }) => (
     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
         {Icon && <Icon className="w-4 h-4" />}
@@ -32,7 +45,6 @@ const StatCard = ({ label, value, icon: Icon, colorClass }) => (
     </div>
 );
 
-import { LocationMap } from '@/components/ui/expand-map';
 
 const Profile = () => {
     const { user, logout } = useAuth();
@@ -52,10 +64,48 @@ const Profile = () => {
     const [showAddLocationModal, setShowAddLocationModal] = useState(false);
     const [newLocationLabel, setNewLocationLabel] = useState('Home');
     const [newLocationAddress, setNewLocationAddress] = useState('');
+    const [newLocationLat, setNewLocationLat] = useState(20.5937);
+    const [newLocationLng, setNewLocationLng] = useState(78.9629);
+    const [mapZoom, setMapZoom] = useState(13);
 
     const [showEditProfileModal, setShowEditProfileModal] = useState(false);
     const [editName, setEditName] = useState('');
     const [editPhone, setEditPhone] = useState('');
+    const [editImage, setEditImage] = useState('');
+    const [isUploading, setIsUploading] = useState(false);
+
+    const handleAvatarChange = async (file) => {
+        if (!file) {
+            // Handle removal or clear
+            setEditImage('');
+            return;
+        }
+
+        setIsUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+            const filePath = `user-avatars/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('event-images') // Using same bucket for now
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage
+                .from('event-images')
+                .getPublicUrl(filePath);
+
+            setEditImage(data.publicUrl);
+        } catch (error) {
+            console.error('Error uploading avatar:', error);
+            showMessage('Failed to upload avatar', { type: 'error' });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
 
     const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
     const [otp, setOtp] = useState('');
@@ -78,6 +128,7 @@ const Profile = () => {
             // Pre-fill edit form
             setEditName(userRes.data.name || '');
             setEditPhone(userRes.data.phoneNumber || '');
+            setEditImage(userRes.data.profileImage || '');
 
         } catch (err) {
             console.error("Failed to load profile data", err);
@@ -96,15 +147,17 @@ const Profile = () => {
     }, [user, navigate, showMessage, fetchData]);
 
     const filteredBookings = useMemo(() => {
-        if (bookingFilter === 'all') return bookings;
-        return bookings.filter(b => b.status.toLowerCase() === bookingFilter.toLowerCase());
+        let filtered = bookingFilter === 'all' ? bookings : bookings.filter(b => b.status.toLowerCase() === bookingFilter.toLowerCase());
+        // Sort by booking time - newest first
+        return filtered.sort((a, b) => new Date(b.bookingTime || 0) - new Date(a.bookingTime || 0));
     }, [bookings, bookingFilter]);
 
     const handleUpdateProfile = async () => {
         try {
             await api.put(`/users/profile/${user.id}`, {
                 name: editName,
-                phoneNumber: editPhone
+                phoneNumber: editPhone,
+                profileImage: editImage
             });
             showMessage("Profile updated successfully", { type: 'success' });
             setShowEditProfileModal(false);
@@ -170,16 +223,23 @@ const Profile = () => {
             await api.post(`/users/locations/${user.id}`, {
                 label: newLocationLabel,
                 address: newLocationAddress,
-                latitude: 20.5937, // Mock or geocode later
-                longitude: 78.9629
+                latitude: newLocationLat,
+                longitude: newLocationLng
             });
             showMessage("Location saved", { type: 'success' });
             setShowAddLocationModal(false);
             setNewLocationAddress('');
+            setNewLocationLat(20.5937);
+            setNewLocationLng(78.9629);
             fetchData();
         } catch (err) {
             showMessage("Failed to save location", { type: 'error' });
         }
+    };
+
+    const handleLocationSelect = (coords) => {
+        setNewLocationLat(coords.latitude);
+        setNewLocationLng(coords.longitude);
     };
 
     const handleDeleteLocation = async (id) => {
@@ -210,6 +270,17 @@ const Profile = () => {
                             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white rounded-2xl p-6 shadow-2xl w-full max-w-md border border-slate-200">
                                 <h3 className="text-lg font-bold text-slate-900 mb-4">Edit Profile</h3>
                                 <div className="space-y-4">
+                                    {/* Image Upload */}
+                                    <div className="flex justify-center mb-4">
+                                        <div className="w-auto">
+                                            <AvatarUpload
+                                                value={editImage}
+                                                onFileChange={handleAvatarChange}
+                                                className="w-full"
+                                            />
+                                            {isUploading && <p className="text-xs text-center text-slate-500 mt-2">Uploading...</p>}
+                                        </div>
+                                    </div>
                                     <div><label className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1 block">Full Name</label><input value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm" /></div>
                                     <div><label className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1 block">Phone Number</label><input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm" /></div>
                                     <div className="flex gap-3 pt-2"><Button variant="outline" className="flex-1" onClick={() => setShowEditProfileModal(false)}>Cancel</Button><Button className="flex-1" onClick={handleUpdateProfile}>Save Changes</Button></div>
@@ -263,26 +334,74 @@ const Profile = () => {
                                 <div className="space-y-4">
                                     <div>
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1 block">Label</label>
-                                        <select
-                                            value={newLocationLabel}
-                                            onChange={(e) => setNewLocationLabel(e.target.value)}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                        >
-                                            <option>Home</option>
-                                            <option>Work</option>
-                                            <option>Hostel</option>
-                                            <option>Other</option>
-                                        </select>
+                                        <Select value={newLocationLabel} onValueChange={setNewLocationLabel}>
+                                            <SelectTrigger className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm h-10 focus:ring-2 focus:ring-primary/20">
+                                                <SelectValue placeholder="Select Label" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Home">Home</SelectItem>
+                                                <SelectItem value="Work">Work</SelectItem>
+                                                <SelectItem value="Hostel">Hostel</SelectItem>
+                                                <SelectItem value="Other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1 block">Address</label>
+                                        <div className="relative mb-2">
+                                            <MapSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <input
+                                                className="w-full h-10 pl-9 pr-4 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white outline-none"
+                                                placeholder="Search places..."
+                                                onKeyDown={async (e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        const q = e.target.value;
+                                                        if (!q) return;
+                                                        try {
+                                                            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`);
+                                                            const data = await res.json();
+                                                            if (data && data.length > 0) {
+                                                                const { lat, lon, display_name } = data[0];
+                                                                setNewLocationLat(Number(lat));
+                                                                setNewLocationLng(Number(lon));
+                                                                setNewLocationAddress(display_name);
+                                                                setMapZoom(15);
+                                                            }
+                                                        } catch (err) {
+                                                            console.error("Search failed", err);
+                                                        }
+                                                    }
+                                                }}
+                                            />
+                                        </div>
                                         <textarea
                                             placeholder="Enter full address..."
                                             value={newLocationAddress}
                                             onChange={(e) => setNewLocationAddress(e.target.value)}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[100px]"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 min-h-[80px]"
                                         />
                                     </div>
+
+                                    {/* Interactive Map Picker */}
+                                    <div className="h-48 rounded-xl overflow-hidden border border-slate-200 shadow-inner">
+                                        <Map
+                                            initialViewState={{
+                                                latitude: newLocationLat,
+                                                longitude: newLocationLng,
+                                                zoom: mapZoom
+                                            }}
+                                            onClick={handleLocationSelect}
+                                        >
+                                            <Marker
+                                                latitude={newLocationLat}
+                                                longitude={newLocationLng}
+                                                draggable
+                                                onDragEnd={handleLocationSelect}
+                                            />
+                                        </Map>
+                                    </div>
+
                                     <div className="flex gap-3 pt-2">
                                         <Button variant="outline" className="flex-1" onClick={() => setShowAddLocationModal(false)}>Cancel</Button>
                                         <Button className="flex-1" onClick={handleAddLocation}>Save Location</Button>
@@ -297,8 +416,17 @@ const Profile = () => {
                 <div className="lg:col-span-4 space-y-6">
                     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                         <div className="flex items-center gap-4 mb-6">
-                            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-primary/20">
-                                <User className="w-8 h-8" />
+                            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-primary/20 overflow-hidden">
+                                {fullUser?.profileImage ? (
+                                    <img
+                                        src={fullUser.profileImage}
+                                        alt={fullUser.name}
+                                        className="w-full h-full object-cover"
+                                        crossOrigin="anonymous"
+                                    />
+                                ) : (
+                                    <User className="w-8 h-8" />
+                                )}
                             </div>
                             <div>
                                 <h1 className="text-xl font-bold text-slate-900">{fullUser?.name}</h1>
@@ -566,11 +694,22 @@ const Profile = () => {
                                                                 <Trash2 className="w-4 h-4" />
                                                             </button>
                                                         </div>
-                                                        {/* Preview Map Area (Mock for now) */}
-                                                        <div className="mt-4 h-24 bg-slate-100 rounded-lg border border-slate-100 overflow-hidden relative">
-                                                            <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-400 opacity-50 uppercase tracking-widest">
-                                                                Preview Map Active
-                                                            </div>
+                                                        {/* Live Preview Map */}
+                                                        <div className="mt-4 h-24 bg-slate-100 rounded-lg border border-slate-100 overflow-hidden relative group-hover:shadow-inner transition-all">
+                                                            <Map
+                                                                initialViewState={{
+                                                                    latitude: loc.latitude || 20.5937,
+                                                                    longitude: loc.longitude || 78.9629,
+                                                                    zoom: 14
+                                                                }}
+                                                                interactive={false}
+                                                                className="w-full h-full"
+                                                            >
+                                                                <Marker
+                                                                    latitude={loc.latitude || 20.5937}
+                                                                    longitude={loc.longitude || 78.9629}
+                                                                />
+                                                            </Map>
                                                         </div>
                                                     </div>
                                                 ))

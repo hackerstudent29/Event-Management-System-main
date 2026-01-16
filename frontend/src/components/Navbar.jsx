@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ExpandableTabs } from './ui/expandable-tabs';
-import { Home, LayoutDashboard, Calendar, LogIn, UserPlus, LogOut, User as UserIcon } from 'lucide-react';
+import { Home, LayoutDashboard, Calendar, LogIn, UserPlus, LogOut, User as UserIcon, Ticket, Scan } from 'lucide-react';
 import { ZendrumLogo } from './ui/invoice';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOnClickOutside } from 'usehooks-ts';
@@ -27,6 +27,12 @@ const Navbar = () => {
         if (user.role === 'ADMIN') {
             tabs.push({ title: "Admin Dashboard", icon: LayoutDashboard, route: "/admin" });
         }
+
+        // Specific Scanner access for Authorized User
+        if (user.email === 'ramzendrum@gmail.com') {
+            tabs.push({ title: "QR Scanner", icon: Scan, route: "/scanner" });
+        }
+        tabs.push({ title: "My Tickets", icon: Ticket, route: "/my-bookings" });
         tabs.push({ title: "Account Profile", icon: UserIcon, route: "/profile" });
         tabs.push({ type: "separator" });
         tabs.push({ title: "Logout", icon: LogOut, action: handleLogout });
@@ -55,14 +61,12 @@ const Navbar = () => {
     });
 
     const location = useLocation();
-    const isCheckoutFlow = location.pathname === '/order-summary' || location.pathname.startsWith('/ticket/');
 
     return (
         <nav
             ref={outsideClickRef}
             className={cn(
-                "fixed left-1/2 transform -translate-x-1/2 z-50 flex items-center bg-background/80 backdrop-blur-md border border-border/40 shadow-xl rounded-2xl p-1 h-14 transition-all duration-500",
-                isCheckoutFlow ? "bottom-8" : "top-4"
+                "fixed left-1/2 transform -translate-x-1/2 z-[100] flex items-center bg-background/80 backdrop-blur-md border border-border/40 shadow-xl rounded-2xl p-1 h-14 transition-all duration-500 top-4"
             )}
         >
             {/* Unified Dock Container */}
@@ -73,7 +77,7 @@ const Navbar = () => {
                         if (!logoExpanded) {
                             setLogoExpanded(true);
                         } else {
-                            navigate('/');
+                            navigate('/zendrum-booking');
                         }
                     }}
                     className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 rounded-xl transition-all duration-300 group"

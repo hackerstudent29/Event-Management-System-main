@@ -15,7 +15,7 @@ import {
     SelectValue
 } from "@/components/ui/select";
 
-export function ModernDatePicker({ date, setDate, placeholder = "Pick a date" }) {
+export function ModernDatePicker({ date, setDate, placeholder = "Pick a date", ...props }) {
     const [isOpen, setIsOpen] = React.useState(false);
 
     // Internal state for month/year navigation
@@ -92,6 +92,7 @@ export function ModernDatePicker({ date, setDate, placeholder = "Pick a date" })
                         day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
                         day_today: "bg-accent text-accent-foreground",
                     }}
+                    {...props}
                 />
 
                 <div className="p-2 bg-slate-50 border-t border-slate-100 flex justify-end">

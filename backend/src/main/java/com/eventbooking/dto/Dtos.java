@@ -42,6 +42,10 @@ public class Dtos {
         private String locationAddress;
         private Double latitude;
         private Double longitude;
+        private String imageUrl;
+        private String imageAspectRatio;
+        private String eventSubType;
+        private String seatingLayoutVariant;
         private java.util.List<CategoryRequest> categories;
         // Total seats is no longer global
     }

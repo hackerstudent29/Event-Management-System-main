@@ -43,9 +43,10 @@ public class AuthService {
         Optional<User> userOpt = userRepository.findByEmail(request.getEmail());
         if (userOpt.isPresent() && passwordEncoder.matches(request.getPassword(), userOpt.get().getPassword())) {
             User user = userOpt.get();
-            if (!user.isEmailVerified()) {
-                throw new RuntimeException("Email not verified. Please verify your email to log in.");
-            }
+            // if (!user.isEmailVerified()) {
+            // throw new RuntimeException("Email not verified. Please verify your email to
+            // log in.");
+            // }
             return user;
         }
         throw new RuntimeException("Invalid credentials");

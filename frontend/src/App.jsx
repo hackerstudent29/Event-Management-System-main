@@ -7,7 +7,6 @@ import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifySignupOtp from './pages/VerifySignupOtp';
 
-// Imports updated
 import EventList from './pages/EventList';
 import EventDetail from './pages/EventDetail';
 import AdminDashboard from './pages/AdminDashboard';
@@ -17,15 +16,21 @@ import OrderSummary from './pages/OrderSummary';
 import TicketPage from './pages/TicketPage';
 import ScannerPage from './pages/ScannerPage';
 import PublicVerifyPage from './pages/PublicVerifyPage';
+import ZendrumBooking from './pages/ZendrumBooking';
 
 import { MessageProvider } from './context/MessageContext';
-import { ToastProvider } from './components/ui/toast-1';
 
-const ProtectedRoute = ({ children, role }) => {
+import ErrorBoundary from './components/ErrorBoundary';
+
+const ProtectedRoute = ({ children, role, allowEmail }) => {
   const { user, loading } = useAuth();
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/login" />;
-  if (role && user.role !== role) return <Navigate to="/" />;
+
+  const hasRole = !role || user.role === role;
+  const hasEmailAccess = allowEmail && user.email === allowEmail;
+
+  if (!hasRole && !hasEmailAccess) return <Navigate to="/" />;
   return children;
 };
 
@@ -36,11 +41,11 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
-
 function App() {
   return (
-    <Router>
-      <ToastProvider>
+    <ErrorBoundary>
+
+      <Router>
         <MessageProvider>
           <AuthProvider>
             <Navbar />
@@ -51,6 +56,7 @@ function App() {
               <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
               <Route path="/verify-signup-otp" element={<PublicRoute><VerifySignupOtp /></PublicRoute>} />
               <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+
               <Route
                 path="/admin"
                 element={
@@ -94,17 +100,18 @@ function App() {
               <Route
                 path="/scanner"
                 element={
-                  <ProtectedRoute role="ADMIN">
+                  <ProtectedRoute role="ADMIN" allowEmail="ramzendrum@gmail.com">
                     <ScannerPage />
                   </ProtectedRoute>
                 }
               />
               <Route path="/verify/:bookingId" element={<PublicVerifyPage />} />
+              <Route path="/zendrum-booking" element={<ZendrumBooking />} />
             </Routes>
           </AuthProvider>
         </MessageProvider>
-      </ToastProvider>
-    </Router>
+      </Router>
+    </ErrorBoundary>
   );
 }
 

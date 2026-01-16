@@ -1,0 +1,20 @@
+# Root Gitignore
+node_modules/
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+.DS_Store
+.env
+.env.*
+.idea/
+.vscode/
+*.swp
+*.swo
+.h2.db
+backend/target/
+frontend/node_modules/
+frontend/dist/
+frontend/.env

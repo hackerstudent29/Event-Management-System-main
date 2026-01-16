@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 const MapContext = React.createContext(null);
 
@@ -58,12 +59,15 @@ export const Map = forwardRef(({
         };
     }, []);
 
+    const styleRef = useRef(mapStyle);
+
     // Update style if it changes
     useEffect(() => {
-        if (map && loaded) {
+        if (map && loaded && mapStyle !== styleRef.current) {
             map.setStyle(mapStyle);
+            styleRef.current = mapStyle;
         }
-    }, [mapStyle, loaded]);
+    }, [mapStyle, loaded, map]);
 
     // Fly to new location if initialViewState changes
     useEffect(() => {
@@ -97,24 +101,23 @@ export const Map = forwardRef(({
 export const Marker = ({ longitude, latitude, draggable = false, onDragEnd, children }) => {
     const { map, loaded } = React.useContext(MapContext);
     const markerRef = useRef(null);
+    const [container, setContainer] = useState(null);
 
+    // Initialize Marker
     useEffect(() => {
         if (!map || !loaded) return;
 
-        // different approach: create DOM element for custom marker if children provided
+        // Create container element if children exist
         const el = document.createElement('div');
         if (children) {
-            // This is tricky in React without portals, usually maplibre markers are simple DOM nodes.
-            // For simplicity in this prompt, we assume default marker if no children, 
-            // BUT we can render children into 'el' using ReactDOM if strictly needed.
-            // Let's stick to default blue marker or basic custom element class.
-            el.className = 'custom-marker';
+            el.className = 'custom-marker-container';
+            setContainer(el);
         }
 
         const marker = new maplibregl.Marker({
             element: children ? el : undefined,
             draggable: draggable,
-            color: '#10b981' // Emerald green
+            color: '#10b981'
         })
             .setLngLat([longitude, latitude])
             .addTo(map);
@@ -130,99 +133,228 @@ export const Marker = ({ longitude, latitude, draggable = false, onDragEnd, chil
 
         return () => {
             marker.remove();
+            setContainer(null);
         };
-    }, [map, loaded]); // Re-create if map reloads (simplified)
+    }, [map, loaded]);
 
     // Update position
     useEffect(() => {
         if (markerRef.current) {
-            const validLon = Number.isFinite(parseFloat(longitude)) ? parseFloat(longitude) : 0;
-            const validLat = Number.isFinite(parseFloat(latitude)) ? parseFloat(latitude) : 0;
+            const validLon = Number.isFinite(parseFloat(longitude)) ? parseFloat(longitude) : null;
+            const validLat = Number.isFinite(parseFloat(latitude)) ? parseFloat(latitude) : null;
 
-            // Only update if valid
-            if (Number.isFinite(validLon) && Number.isFinite(validLat)) {
+            if (validLon !== null && validLat !== null) {
                 markerRef.current.setLngLat([validLon, validLat]);
             }
         }
     }, [longitude, latitude]);
 
-    return null; // Rendered via maplibre API
+    // Portal for custom children
+    if (children && container) {
+        return createPortal(children, container);
+    }
+
+    return null;
 };
 
 export const MapRoute = ({ from, to, color = '#3b82f6', profile = 'driving', onRouteStats }) => {
     const { map, loaded } = React.useContext(MapContext);
+    const mapRef = useRef(map);
+    const routeDataRef = useRef(null);
 
+    // Keep mapRef in sync
+    useEffect(() => { mapRef.current = map; }, [map]);
+
+    // Helper: Haversine
+    const haversineDistance = (lat1, lon1, lat2, lon2) => {
+        const R = 6371e3;
+        const φ1 = lat1 * Math.PI / 180;
+        const φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    };
+
+    // Draw Function
+    const drawRoute = useCallback(() => {
+        const m = mapRef.current;
+        if (!m || !routeDataRef.current) return;
+
+        try {
+            // Safety check: style must be loaded
+            if (!m.getStyle || !m.getStyle()) return;
+
+            const layerId = 'poly-route';
+            const data = routeDataRef.current;
+
+            // Check source existence safely
+            if (m.getSource && !m.getSource(layerId)) {
+                m.addSource(layerId, { type: 'geojson', data });
+            } else if (m.getSource) {
+                m.getSource(layerId).setData(data);
+            }
+
+            // Check layer existence safely
+            if (m.getLayer && !m.getLayer(layerId)) {
+                // Remove if incorrectly present
+                if (m.getLayer(layerId)) m.removeLayer(layerId);
+
+                m.addLayer({
+                    id: layerId,
+                    type: 'line',
+                    source: layerId,
+                    layout: {
+                        'line-join': 'round',
+                        'line-cap': 'round'
+                    },
+                    paint: {
+                        'line-color': '#3b82f6', // Standard Blue
+                        'line-width': 6,
+                        'line-opacity': 0.8
+                    }
+                });
+
+                // Ensure on top - safely
+                if (m.moveLayer) m.moveLayer(layerId);
+            } else if (m.setPaintProperty && m.moveLayer) {
+                m.setPaintProperty(layerId, 'line-color', '#3b82f6');
+                m.setPaintProperty(layerId, 'line-width', 6);
+                m.moveLayer(layerId);
+            }
+        } catch (e) {
+            console.warn("MapRoute: Draw error (handled)", e);
+        }
+    }, []);
+
+    // Fetch Effect
     useEffect(() => {
         if (!map || !loaded || !from || !to) return;
 
+        const fLng = parseFloat(from.lng || from.longitude);
+        const fLat = parseFloat(from.lat || from.latitude);
+        const tLng = parseFloat(to.lng || to.longitude);
+        const tLat = parseFloat(to.lat || to.latitude);
+
+        if (isNaN(fLng) || isNaN(fLat) || isNaN(tLng) || isNaN(tLat)) return;
+        if ((fLng === 0 && fLat === 0) || (tLng === 0 && tLat === 0)) return;
+
         const fetchRoute = async () => {
             try {
-                // Using OSRM public demo server (Good for dev, switch for prod if heavily used)
-                const query = `http://router.project-osrm.org/route/v1/${profile}/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
-                const res = await fetch(query);
-                const data = await res.json();
+                const profileType = profile === 'walking' ? 'walking' : (profile === 'cycling' ? 'cycling' : 'driving');
 
-                if (!data.routes || data.routes.length === 0) return;
+                // Use main OSRM server for better global coverage
+                const baseUrl = `https://router.project-osrm.org/route/v1/${profileType}`;
+                const query = `${baseUrl}/${fLng.toFixed(6)},${fLat.toFixed(6)};${tLng.toFixed(6)},${tLat.toFixed(6)}?overview=full&geometries=geojson`;
+
+                console.log(`MapRoute: Fetching for profile: '${profile}' -> '${profileType}'`);
+                console.log(`MapRoute: Requesting URL: ${query}`);
+
+                const res = await fetch(query);
+                if (!res.ok) throw new Error(`Status ${res.status}`);
+
+                const data = await res.json();
+                if (!data.routes || !data.routes.length) throw new Error("No routes", data);
 
                 const route = data.routes[0];
+                console.log("MapRoute: OK. Geo points:", route.geometry.coordinates.length);
 
-                // Invoke callback if provided
-                if (onRouteStats) {
-                    onRouteStats({
-                        distance: route.distance, // meters
-                        duration: route.duration  // seconds
-                    });
+                // VISUAL FIX: Connect route to exact start/end dots (OSRM snaps to nearest road)
+                if (route.geometry && route.geometry.coordinates) {
+                    route.geometry.coordinates.unshift([fLng, fLat]);
+                    route.geometry.coordinates.push([tLng, tLat]);
                 }
 
-                const geojson = {
-                    type: 'Feature',
-                    properties: {},
-                    geometry: route.geometry
+                // Manual duration calculation to fix OSRM anomalies
+                let finalDuration = route.duration;
+                if (profile === 'walking') {
+                    finalDuration = route.distance / 1.35; // ~4.8 km/h
+                } else if (profile === 'cycling') {
+                    finalDuration = route.distance / 5.5; // ~20 km/h
+                }
+
+                // Use FeatureCollection for robustness
+                routeDataRef.current = {
+                    type: 'FeatureCollection',
+                    features: [{
+                        type: 'Feature',
+                        properties: { isFallback: false },
+                        geometry: route.geometry
+                    }]
                 };
+                drawRoute();
 
-                if (map.getSource('route')) {
-                    map.getSource('route').setData(geojson);
-                } else {
-                    map.addSource('route', {
-                        type: 'geojson',
-                        data: geojson
-                    });
-                    map.addLayer({
-                        id: 'route',
-                        type: 'line',
-                        source: 'route',
-                        layout: {
-                            'line-join': 'round',
-                            'line-cap': 'round'
-                        },
-                        paint: {
-                            'line-color': color,
-                            'line-width': 4,
-                            'line-opacity': 0.75
-                        }
-                    });
-                }
+                if (onRouteStats) onRouteStats({ distance: route.distance, duration: finalDuration });
 
-                // Fit bounds
                 const bounds = new maplibregl.LngLatBounds();
-                bounds.extend([from.lng, from.lat]);
-                bounds.extend([to.lng, to.lat]);
-                map.fitBounds(bounds, { padding: 50 });
+                bounds.extend([fLng, fLat]);
+                bounds.extend([tLng, tLat]);
+                map.fitBounds(bounds, { padding: 80, maxZoom: 15 });
 
             } catch (err) {
-                console.error("Failed to fetch route", err);
+                console.warn("MapRoute: Fallback.", err);
+                routeDataRef.current = {
+                    type: 'FeatureCollection',
+                    features: [{
+                        type: 'Feature',
+                        properties: { isFallback: true },
+                        geometry: {
+                            type: 'LineString',
+                            coordinates: [[fLng, fLat], [tLng, tLat]]
+                        }
+                    }]
+                };
+                drawRoute();
+
+                if (onRouteStats) {
+                    const d = haversineDistance(fLat, fLng, tLat, tLng);
+                    const s = profile === 'walking' ? 1.4 : (profile === 'cycling' ? 4.2 : 13.9);
+                    onRouteStats({ distance: d, duration: (d / s) });
+                }
+                const bounds = new maplibregl.LngLatBounds();
+                bounds.extend([fLng, fLat]);
+                bounds.extend([tLng, tLat]);
+                map.fitBounds(bounds, { padding: 80, maxZoom: 15 });
             }
         };
 
         fetchRoute();
+    }, [map, loaded, from?.lng, from?.lat, to?.lng, to?.lat, profile, drawRoute]);
 
-        return () => {
-            if (map && map.getLayer('route')) {
-                map.removeLayer('route');
-                map.removeSource('route');
+    // Cleanup and Style Persistence
+    useEffect(() => {
+        if (!map) return;
+
+        const handleStyleData = () => {
+            if (map.isStyleLoaded && map.isStyleLoaded() && routeDataRef.current) {
+                drawRoute();
             }
         };
-    }, [map, loaded, from?.lng, from?.lat, to?.lng, to?.lat, profile]);
+
+        if (map.on) map.on('styledata', handleStyleData);
+
+        return () => {
+            try {
+                if (map && map.off) map.off('styledata', handleStyleData);
+
+                // Cleanup layer on unmount - with safety
+                const m = mapRef.current;
+                if (m && m.getLayer && m.getSource) {
+                    if (m.getLayer('poly-route')) {
+                        try { m.removeLayer('poly-route'); } catch (e) { }
+                    }
+                    if (m.getSource('poly-route')) {
+                        try { m.removeSource('poly-route'); } catch (e) { }
+                    }
+                }
+            } catch (e) {
+                // Ignore cleanup errors on unmount
+            }
+        };
+    }, [map, drawRoute]);
 
     return null;
 };

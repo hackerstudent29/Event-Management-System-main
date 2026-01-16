@@ -7,6 +7,7 @@ D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\model\
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\EmailService.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\model\SeatHold.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\EventRepository.java
+D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\controller\MaintenanceController.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\config\SchemaFixer.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\security\JwtUtil.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\controller\UserController.java
@@ -14,10 +15,8 @@ D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\reposi
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\EventService.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\model\EmailOtp.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\BookingService.java
-D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\controller\AdminSetupController.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\BookingRepository.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\UserRepository.java
-D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\controller\AdminCheckController.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\security\SecurityConfig.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\UserService.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\config\DataInitializer.java
@@ -27,6 +26,7 @@ D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\securi
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\OtpService.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\EventCategoryRepository.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\controller\BookingController.java
+D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\config\StorageInitializer.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\EmailOtpRepository.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\dto\OtpDtos.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\CustomUserDetailsService.java

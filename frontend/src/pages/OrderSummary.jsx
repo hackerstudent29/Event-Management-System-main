@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { CreditCard, MapPin, Calculator, Ticket, ChevronLeft, Calendar as CalendarIcon, Clock } from "lucide-react";
+import { CreditCard, MapPin, Ticket, ChevronLeft, Calendar as CalendarIcon } from "lucide-react";
 import api from '../api/axios';
 import { useMessage } from "../context/MessageContext";
+import { cn } from "@/lib/utils";
+import { getDefaultEventImage } from "../lib/image-utils";
 
 export default function OrderSummary() {
     const location = useLocation();
@@ -14,7 +15,7 @@ export default function OrderSummary() {
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [bookingConfirmed, setBookingConfirmed] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState("card");
+    const [paymentMethod, setPaymentMethod] = useState("upi");
     const { showMessage } = useMessage();
 
     // Fallback if accessed directly without state
@@ -23,6 +24,23 @@ export default function OrderSummary() {
             <div className="flex flex-col items-center justify-center min-h-screen bg-white">
                 <p className="text-gray-500 mb-4">No booking details found.</p>
                 <Button onClick={() => navigate('/')}>Go Home</Button>
+            </div>
+        );
+    }
+
+    // Safety check for past events
+    const isPast = event?.eventDate && new Date(event.eventDate) < new Date();
+    if (isPast) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-white p-4 text-center">
+                <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-6">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Booking Expired</h2>
+                <p className="text-gray-500 mb-8 max-w-sm">This event has already finished. Booking is no longer possible.</p>
+                <Button onClick={() => navigate('/')}>Find More Events</Button>
             </div>
         );
     }
@@ -72,17 +90,17 @@ export default function OrderSummary() {
 
     if (bookingConfirmed) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-                <div className="bg-white max-w-md w-full rounded-2xl shadow-xl p-8 text-center border border-gray-100">
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <div className="bg-white max-w-md w-full rounded-2xl shadow-xl p-8 text-center border border-slate-100">
                     <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                         <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
-                    <p className="text-gray-500 mb-8">Your tickets have been sent to your email.</p>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Booking Confirmed!</h2>
+                    <p className="text-slate-500 mb-8">Your tickets have been sent to your email.</p>
                     <div className="flex flex-col gap-3">
-                        <Button className="w-full h-12 text-base" onClick={() => navigate('/my-bookings')}>View My Bookings</Button>
+                        <Button className="w-full h-12 text-base bg-slate-900 hover:bg-slate-800" onClick={() => navigate('/my-bookings')}>View My Bookings</Button>
                         <Button variant="outline" className="w-full h-12 text-base" onClick={() => navigate('/')}>Back to Home</Button>
                     </div>
                 </div>
@@ -91,154 +109,208 @@ export default function OrderSummary() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-            {/* Header */}
-            <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-                <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-                    <button onClick={() => navigate(-1)} className="flex items-center text-gray-600 hover:text-gray-900 transition-colors">
-                        <ChevronLeft className="h-5 w-5 mr-1" />
-                        Back
+        <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+            {/* Minimal Header */}
+            <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+                <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+                    <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
+                        <ChevronLeft className="h-4 w-4" /> Back
                     </button>
-                    <h1 className="text-lg font-semibold text-gray-800">Checkout</h1>
+                    <div className="text-sm font-semibold text-slate-400 uppercase tracking-widest">
+                        Secure Checkout
+                    </div>
                     <div className="w-16"></div>
                 </div>
             </header>
 
-            <main className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <main className="max-w-5xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                {/* Left Column: Payment Options */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                            <CreditCard className="h-5 w-5 text-red-500" />
-                            Payment Options
-                        </h2>
+                {/* Left Column: Payment & Contact */}
+                <div className="lg:col-span-2 space-y-8">
 
-                        <div className="grid gap-4">
-                            <label className={`flex items-center p-4 border rounded-lg cursor-pointer transition-all ${paymentMethod === 'card' ? 'border-red-500 bg-red-50 ring-1 ring-red-500' : 'border-gray-200 hover:border-gray-300'}`}>
-                                <input type="radio" name="payment" value="card" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500" />
-                                <div className="ml-4 flex-1">
-                                    <span className="block font-medium text-gray-900">Credit / Debit Card</span>
-                                    <span className="block text-sm text-gray-500">Visa, Mastercard, RuPay</span>
-                                </div>
-                                <CreditCard className="h-6 w-6 text-gray-400" />
-                            </label>
-
-                            <label className={`flex items-center p-4 border rounded-lg cursor-pointer transition-all ${paymentMethod === 'upi' ? 'border-red-500 bg-red-50 ring-1 ring-red-500' : 'border-gray-200 hover:border-gray-300'}`}>
-                                <input type="radio" name="payment" value="upi" checked={paymentMethod === 'upi'} onChange={() => setPaymentMethod('upi')} className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500" />
-                                <div className="ml-4 flex-1">
-                                    <span className="block font-medium text-gray-900">UPI</span>
-                                    <span className="block text-sm text-gray-500">Google Pay, PhonePe, Paytm</span>
-                                </div>
-                                <svg className="h-6 w-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M10.2 16.6c-.3 0-.6-.1-.8-.3l-2.6-2.6c-.2-.2-.2-.5 0-.7.2-.2.5-.2.7 0l2.2 2.2 5.2-5.7c.2-.2.5-.2.7 0 .2.2.2.5 0 .7l-5.6 6.1c-.2.2-.4.3-.7.3z" /></svg>
-                            </label>
+                    {/* 1. Contact (Passive Confirmation) */}
+                    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex items-start gap-4">
+                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg shrink-0">
+                            <Ticket className="w-5 h-5" />
                         </div>
-
-                        {paymentMethod === 'card' && (
-                            <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
-                                <p className="text-sm text-gray-500 text-center italic">
-                                    This is a demo payment gateway. No actual money will be deducted.
-                                </p>
-                            </div>
-                        )}
+                        <div>
+                            <h3 className="font-bold text-slate-900 text-sm mb-1">Contact Details</h3>
+                            <p className="text-slate-500 text-sm">
+                                Tickets will be sent to <span className="font-semibold text-slate-900">{bookingPayload?.[0]?.userId || "your registered email"}</span> and via SMS to your phone.
+                            </p>
+                        </div>
+                        <button className="ml-auto text-sm font-medium text-blue-600 hover:underline">Edit</button>
                     </div>
 
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <h2 className="text-lg font-bold text-gray-900 mb-2">Share your contact details</h2>
-                        <p className="text-sm text-gray-500 mb-4">We'll send the tickets to {bookingPayload?.[0]?.userId ? "your registered email" : "you"}.</p>
-                        <div className="flex gap-4">
-                            <input type="text" placeholder="Email Address" disabled className="flex-1 p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-500 cursor-not-allowed" value="Logged In User (Default)" />
-                            <input type="text" placeholder="Phone Number" className="flex-1 p-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none" />
+                    {/* 2. Payment Options (Compact & Focused) */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
+                            <h2 className="font-bold text-slate-900 flex items-center gap-2">
+                                Payment Method
+                            </h2>
                         </div>
+
+                        <div className="divide-y divide-slate-100">
+                            {/* UPI Option */}
+                            <label className={cn("relative flex flex-col p-6 cursor-pointer transition-colors", paymentMethod === 'upi' ? "bg-blue-50/10" : "hover:bg-slate-50")}>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        type="radio"
+                                        name="payment"
+                                        value="upi"
+                                        checked={paymentMethod === 'upi'}
+                                        onChange={() => setPaymentMethod('upi')}
+                                        className="w-5 h-5 text-slate-900 border-slate-300 focus:ring-slate-900"
+                                    />
+                                    <div className="flex-1">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-bold text-slate-900">UPI</span>
+                                            <div className="flex gap-2 opacity-80 grayscale transition-all data-[state=active]:grayscale-0" data-state={paymentMethod === 'upi' ? 'active' : ''}>
+                                                {/* Simple CSS Icons or SVGs for GPay/PhonePe placeholders */}
+                                                <div className="h-5 w-8 bg-slate-200 rounded"></div>
+                                                <div className="h-5 w-8 bg-slate-200 rounded"></div>
+                                                <div className="h-5 w-8 bg-slate-200 rounded"></div>
+                                            </div>
+                                        </div>
+                                        <p className="text-sm text-slate-500 mt-1">Google Pay, PhonePe, Paytm, BHIM</p>
+                                    </div>
+                                </div>
+
+                                {/* Expanded State for UPI */}
+                                {paymentMethod === 'upi' && (
+                                    <div className="mt-4 ml-9 animate-in slide-in-from-top-2 fade-in duration-200">
+                                        <div className="p-4 bg-white border border-slate-200 rounded-xl">
+                                            <p className="text-sm text-slate-600 mb-3">Pay securely with any UPI app</p>
+                                            <div className="flex gap-3">
+                                                <button className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">Google Pay</button>
+                                                <button className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">PhonePe</button>
+                                                <button className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">Paytm</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </label>
+
+                            {/* Card Option */}
+                            <label className={cn("relative flex flex-col p-6 cursor-pointer transition-colors", paymentMethod === 'card' ? "bg-blue-50/10" : "hover:bg-slate-50")}>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        type="radio"
+                                        name="payment"
+                                        value="card"
+                                        checked={paymentMethod === 'card'}
+                                        onChange={() => setPaymentMethod('card')}
+                                        className="w-5 h-5 text-slate-900 border-slate-300 focus:ring-slate-900"
+                                    />
+                                    <div className="flex-1">
+                                        <span className="font-bold text-slate-900">Credit / Debit Card</span>
+                                        <p className="text-sm text-slate-500 mt-1">Visa, Mastercard, RuPay</p>
+                                    </div>
+                                    <CreditCard className="w-5 h-5 text-slate-400" />
+                                </div>
+
+                                {/* Expanded State for Card */}
+                                {paymentMethod === 'card' && (
+                                    <div className="mt-4 ml-9 animate-in slide-in-from-top-2 fade-in duration-200">
+                                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-center">
+                                            <p className="text-sm text-slate-500 italic">Card fields would appear here (Demo Mode)</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Trust Seals */}
+                    <div className="flex items-center justify-center gap-6 text-slate-400 grayscale opacity-60 mt-4">
+                        <div className="text-xs uppercase font-bold tracking-widest flex items-center gap-1">
+                            <span className="text-lg">🔒</span> 100% Secure
+                        </div>
+                        <div className="h-4 w-px bg-slate-300"></div>
+                        <div className="text-xs uppercase font-bold tracking-widest">256-bit Encryption</div>
                     </div>
                 </div>
 
-                {/* Right Column: Order Summary */}
+                {/* Right Column: Sticky Summary */}
                 <div className="lg:col-span-1">
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 sticky top-24 overflow-hidden">
-                        <div className="p-6 border-b border-gray-100">
-                            <span className="inline-block px-2 py-1 bg-red-100 text-red-600 text-xs font-bold rounded mb-2 uppercase tracking-wide">
-                                {event?.eventType || 'Event'}
-                            </span>
-                            <h2 className="text-lg font-bold text-gray-900 leading-tight mb-2">{event?.name || 'Event Name'}</h2>
-                            <div className="flex items-center text-sm text-gray-500 gap-4">
-                                <div className="flex items-center gap-1">
-                                    <CalendarIcon className="h-4 w-4" />
-                                    {event?.eventDate ? new Date(event.eventDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : 'TBD'}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Clock className="h-4 w-4" />
-                                    {event?.eventDate ? new Date(event.eventDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD'}
-                                </div>
+                    <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 sticky top-24 overflow-hidden">
+                        <div className="aspect-video w-full overflow-hidden bg-slate-100 border-b border-slate-100">
+                            <img
+                                src={event?.imageUrl || getDefaultEventImage(event?.eventType)}
+                                alt={event?.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                    const fallback = getDefaultEventImage(event?.eventType);
+                                    if (e.target.src !== fallback) {
+                                        e.target.src = fallback;
+                                    }
+                                }}
+                            />
+                        </div>
+                        <div className="p-6 bg-slate-50/50 border-b border-slate-100">
+                            <h3 className="font-bold text-slate-900 text-lg">{event?.name || "Event Name"}</h3>
+                            <div className="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                                <CalendarIcon className="w-3.5 h-3.5" />
+                                {event?.eventDate ? new Date(event.eventDate).toLocaleDateString() : 'Date TBD'}
                             </div>
-                            <div className="flex items-center text-sm text-gray-500 mt-2">
-                                <MapPin className="h-4 w-4 mr-1" />
-                                {event?.locationName || event?.venue || 'Venue TBD'}
+                            <div className="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                                <MapPin className="w-3.5 h-3.5" />
+                                {event?.locationName || "Venue"}
                             </div>
+                            {bookingPayload && (
+                                <div className="mt-3 pt-3 border-t border-slate-200/50">
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Selected Seats</div>
+                                    <div className="text-sm font-semibold text-slate-700">
+                                        {bookingPayload.map(b => b.seatId?.includes('::') ? b.seatId.split('::')[1] : b.seatId).join(', ')}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="p-6 space-y-4">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
-                                <Ticket className="h-4 w-4 text-primary" />
-                                Order Details
-                            </h3>
-
-                            <div className="space-y-4">
-                                {(purchasedItems || []).map((item, index) => (
-                                    <div key={index} className="flex justify-between items-center group">
-                                        <div className="text-sm text-slate-500 font-medium">
-                                            Ticket <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded ml-1 uppercase">{item.categoryName} × {item.count}</span>
-                                        </div>
-                                        <div className="font-bold text-slate-900 leading-none">
-                                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(item.total)}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="space-y-3 pt-2">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-slate-500 font-medium">Convenience Fee</span>
-                                    <span className="font-bold text-slate-900 leading-none">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(convenienceFee)}</span>
+                            <div className="space-y-3">
+                                <div className="flex justify-between text-sm text-slate-600">
+                                    <span>Tickets ({totalQty})</span>
+                                    <span className="font-medium text-slate-900">₹{ticketPrice}</span>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs font-semibold text-slate-400 italic">Tax (18% GST on Fee)</span>
-                                    <span className="text-xs font-bold text-slate-400 leading-none">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(gstAmount)}</span>
+                                <div className="flex justify-between text-sm text-slate-600">
+                                    <span>Convenience Fee</span>
+                                    <span className="font-medium text-slate-900">₹{convenienceFee}</span>
+                                </div>
+                                <div className="flex justify-between text-sm text-slate-600">
+                                    <span>GST (18%)</span>
+                                    <span className="font-medium text-slate-900">₹{gstAmount}</span>
                                 </div>
                             </div>
 
-                            <div className="h-px bg-slate-100 my-2"></div>
+                            <div className="h-px bg-slate-100"></div>
 
-                            <div className="flex justify-between items-center py-2">
-                                <div>
-                                    <span className="block text-sm font-bold text-slate-950">Amount Payable</span>
-                                    <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Including all taxes</span>
-                                </div>
-                                <div className="text-right">
-                                    <span className="text-2xl font-black text-slate-950 tracking-tighter">
-                                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalAmount)}
-                                    </span>
-                                </div>
+                            <div className="flex justify-between items-end">
+                                <span className="font-bold text-slate-900">Total</span>
+                                <span className="font-black text-2xl text-slate-900">
+                                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalAmount)}
+                                </span>
                             </div>
-                        </div>
 
-                        <div className="p-4 bg-gray-50 border-t border-gray-200">
                             <Button
-                                className="w-full h-12 text-base font-semibold bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20 rounded-lg"
                                 onClick={handlePayment}
                                 disabled={isProcessing}
+                                className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-all shadow-lg shadow-slate-900/10 active:scale-95 flex items-center justify-center gap-2 mt-4"
                             >
                                 {isProcessing ? (
-                                    <div className="flex items-center justify-center gap-2">
-                                        <div className="h-4 w-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
-                                        Processing...
-                                    </div>
+                                    <>Processing...</>
                                 ) : (
-                                    `Pay ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(totalAmount || 0)}`
+                                    <>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                                        Pay {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalAmount)}
+                                    </>
                                 )}
                             </Button>
-                            <p className="text-xs text-center text-gray-500 mt-3">
-                                By proceeding, you agree to our Terms & Conditions
+                        </div>
+
+                        <div className="bg-slate-50 p-3 text-center border-t border-slate-100">
+                            <p className="text-[10px] text-slate-400 font-medium flex items-center justify-center gap-1">
+                                <span className="text-green-500">🛡️</span> Safe & Secure Payment
                             </p>
                         </div>
                     </div>

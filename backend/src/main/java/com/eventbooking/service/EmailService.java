@@ -116,7 +116,7 @@ public class EmailService {
                             """,
                     title, bodyText, otp);
 
-            helper.setText(htmlContent, true);
+            helper.setText(Objects.requireNonNull(htmlContent), true);
             mailSender.send(message);
 
         } catch (Exception e) {
@@ -125,52 +125,6 @@ public class EmailService {
             System.err.println("FAILED TO SEND EMAIL: " + e.getMessage());
             throw new RuntimeException("Failed to send OTP email", e);
         }
-    }
-
-    private String convertToWords(double num) {
-        String[] units = { "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven",
-                "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen" };
-        String[] tens = { "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety" };
-
-        if (num == 0)
-            return "Zero";
-
-        long whole = (long) num;
-        int fraction = (int) Math.round((num - whole) * 100);
-
-        StringBuilder sb = new StringBuilder();
-        if (whole >= 100000) {
-            sb.append(units[(int) (whole / 100000)]).append(" Lakh ");
-            whole %= 100000;
-        }
-        if (whole >= 1000) {
-            sb.append(units[(int) (whole / 1000)]).append(" Thousand ");
-            whole %= 1000;
-        }
-        if (whole >= 100) {
-            sb.append(units[(int) (whole / 100)]).append(" Hundred ");
-            whole %= 100;
-        }
-        if (whole > 0) {
-            if (sb.length() > 0)
-                sb.append("and ");
-            if (whole < 20)
-                sb.append(units[(int) whole]);
-            else {
-                sb.append(tens[(int) (whole / 10)]).append(" ").append(units[(int) (whole % 10)]);
-            }
-        }
-
-        sb.append(" Rupee(s) ");
-        if (fraction > 0) {
-            sb.append("And ");
-            if (fraction < 20)
-                sb.append(units[fraction]);
-            else
-                sb.append(tens[fraction / 10]).append(" ").append(units[fraction % 10]);
-            sb.append(" Paisa ");
-        }
-        return sb.append("Only.").toString();
     }
 
     public void sendTicketEmail(String to, com.eventbooking.model.Booking booking) {
@@ -325,7 +279,7 @@ public class EmailService {
                     bookingIdShort, eventImageUrl, event.getName(), event.getLocationName(), eventDateStr,
                     category.getCategoryName(), booking.getSeatsBooked(), subtotal, totalConvAndTax, grandTotal, qrUrl);
 
-            helper.setText(htmlContent, true);
+            helper.setText(Objects.requireNonNull(htmlContent), true);
             mailSender.send(message);
 
         } catch (Exception e) {
@@ -463,7 +417,7 @@ public class EmailService {
                             """,
                     event.getName(), eventDateStr, bookingIdShort, cancellationReason, refundAmount);
 
-            helper.setText(htmlContent, true);
+            helper.setText(Objects.requireNonNull(htmlContent), true);
             mailSender.send(message);
 
         } catch (Exception e) {

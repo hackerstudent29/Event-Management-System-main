@@ -1,6 +1,5 @@
 package com.eventbooking.service;
 
-import com.eventbooking.dto.Dtos;
 import com.eventbooking.model.Booking;
 import com.eventbooking.model.User;
 import com.eventbooking.model.UserLocation;
@@ -14,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class UserService {
@@ -34,15 +34,18 @@ public class UserService {
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     public User getUser(UUID userId) {
-        return userRepository.findById(userId)
+        return userRepository.findById(Objects.requireNonNull(userId))
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
     @Transactional
-    public User updateProfile(UUID userId, String name, String phoneNumber) {
+    public User updateProfile(UUID userId, String name, String phoneNumber, String profileImage) {
         User user = getUser(userId);
         user.setName(name);
         user.setPhoneNumber(phoneNumber);
+        if (profileImage != null) {
+            user.setProfileImage(profileImage);
+        }
         return userRepository.save(user);
     }
 
@@ -95,11 +98,11 @@ public class UserService {
 
     @Transactional
     public void deleteLocation(UUID locationId) {
-        userLocationRepository.deleteById(locationId);
+        userLocationRepository.deleteById(Objects.requireNonNull(locationId));
     }
 
     @Transactional
     public void deleteAccount(UUID userId) {
-        userRepository.deleteById(userId);
+        userRepository.deleteById(Objects.requireNonNull(userId));
     }
 }

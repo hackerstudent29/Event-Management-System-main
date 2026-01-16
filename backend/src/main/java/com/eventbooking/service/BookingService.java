@@ -50,12 +50,26 @@ public class BookingService {
         com.eventbooking.model.EventCategory freshCat = eventCategoryRepository.findByIdWithLock(category.getId())
                 .orElseThrow(() -> new RuntimeException("Category no longer exists"));
 
+        // Reject bookings for past events
+        if (freshCat.getEvent().getEventDate().isBefore(java.time.LocalDateTime.now())) {
+            throw new RuntimeException("Booking closed. This event has already finished.");
+        }
+
         if (freshCat.getAvailableSeats() < request.getSeats()) {
             throw new RuntimeException(String.format(
                     "Not enough seats available in category '%s'. Requested: %d, Available: %d",
                     freshCat.getCategoryName(),
                     request.getSeats(),
                     freshCat.getAvailableSeats()));
+        }
+
+        // Enforce Ticket Limits per booking
+        // Theatre: Max 10, Others: Max 5
+        String eventType = freshCat.getEvent().getEventType();
+        int maxTickets = "Theatre".equalsIgnoreCase(eventType) ? 10 : 5;
+        if (request.getSeats() > maxTickets) {
+            throw new RuntimeException("Ticket limit exceeded. You can only book up to " + maxTickets + " tickets for "
+                    + (eventType != null ? eventType : "this event") + ".");
         }
 
         // Decrement seats
@@ -89,6 +103,12 @@ public class BookingService {
         hold.setUserId(request.getUserId());
         hold.setEventCategoryId(request.getEventCategoryId());
         hold.setSeatIdentifiers(String.join(", ", request.getSeatIds()));
+        com.eventbooking.model.EventCategory category = eventCategoryRepository.findById(request.getEventCategoryId())
+                .orElseThrow(() -> new RuntimeException("Category not found"));
+        if (category.getEvent().getEventDate().isBefore(java.time.LocalDateTime.now())) {
+            throw new RuntimeException("Cannot hold seats for a past event.");
+        }
+
         hold.setExpiresAt(java.time.LocalDateTime.now().plusSeconds(15)); // 15 second hold
         seatHoldRepository.save(hold);
 
@@ -120,14 +140,14 @@ public class BookingService {
     }
 
     public void emailTicket(UUID bookingId) {
-        Booking booking = bookingRepository.findById(bookingId)
+        Booking booking = bookingRepository.findById(Objects.requireNonNull(bookingId))
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
         emailService.sendTicketEmail(booking.getUser().getEmail(), booking);
     }
 
     @Transactional
     public Dtos.ScanResponse scanTicket(UUID bookingId) {
-        Booking booking = bookingRepository.findById(bookingId).orElse(null);
+        Booking booking = bookingRepository.findById(Objects.requireNonNull(bookingId)).orElse(null);
         if (booking == null) {
             return new Dtos.ScanResponse("INVALID", "Ticket not found in system.");
         }
@@ -155,7 +175,7 @@ public class BookingService {
     }
 
     public Dtos.ScanResponse verifyTicket(UUID bookingId) {
-        Booking booking = bookingRepository.findById(bookingId).orElse(null);
+        Booking booking = bookingRepository.findById(Objects.requireNonNull(bookingId)).orElse(null);
         if (booking == null) {
             return new Dtos.ScanResponse("INVALID", "Ticket not found.");
         }
@@ -175,7 +195,7 @@ public class BookingService {
 
     @Transactional
     public void resetCheckIn(UUID bookingId) {
-        Booking booking = bookingRepository.findById(bookingId)
+        Booking booking = bookingRepository.findById(Objects.requireNonNull(bookingId))
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
         booking.setCheckedIn(false);
         booking.setCheckedInAt(null);

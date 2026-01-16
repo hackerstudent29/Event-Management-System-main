@@ -8,9 +8,11 @@ import { Map, Marker, MapRoute } from '@/components/ui/map';
 import {
     Navigation, Car, Bike, Footprints, Bus,
     MapPin, Search, Calendar, Clock, Ticket as TicketIcon, LocateFixed,
-    ParkingSquare, Train
+    ParkingSquare, Train, ChevronLeft, Home, Briefcase, School
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { calculateGapPositions, getGapRuleForSubtype } from '@/lib/gap-utils';
+import { getDefaultEventImage } from '../lib/image-utils';
 
 const TransportMode = ({ active, onClick, icon: Icon, label }) => (
     <button
@@ -55,6 +57,7 @@ const EventDetail = () => {
     const [nearbyTransit, setNearbyTransit] = useState([]);
     const [loadingAmenities, setLoadingAmenities] = useState(false);
     const [occupiedSeatIdsFromServer, setOccupiedSeatIdsFromServer] = useState([]);
+    const [savedLocations, setSavedLocations] = useState([]);
 
     // 1. Fetch Event
     useEffect(() => {
@@ -72,33 +75,46 @@ const EventDetail = () => {
     }, [id]);
 
     // 1.5 Fetch Occupied Seats
+    const fetchAllOccupied = useCallback(async () => {
+        if (!event?.categories || !Array.isArray(event.categories)) return;
+        try {
+            const allOccupied = [];
+            await Promise.all(event.categories.map(async (cat) => {
+                const res = await api.get(`/bookings/occupied/${cat.id}`);
+                if (Array.isArray(res.data)) {
+                    res.data.forEach(id => {
+                        allOccupied.push(`${cat.id}::${id}`);
+                    });
+                }
+            }));
+            setOccupiedSeatIdsFromServer(allOccupied);
+        } catch (err) {
+            console.error("Failed to fetch occupied seats", err);
+        }
+    }, [event?.categories]);
+
     useEffect(() => {
         if (!event?.categories) return;
-
-        const fetchAllOccupied = async () => {
-            try {
-                const allOccupied = [];
-                await Promise.all(event.categories.map(async (cat) => {
-                    const res = await api.get(`/bookings/occupied/${cat.id}`);
-                    // IDs from server are "rowSeat" e.g., "D5"
-                    // We need to prepend catId:: to match our frontend format
-                    if (Array.isArray(res.data)) {
-                        res.data.forEach(id => {
-                            allOccupied.push(`${cat.id}::${id}`);
-                        });
-                    }
-                }));
-                setOccupiedSeatIdsFromServer(allOccupied);
-            } catch (err) {
-                console.error("Failed to fetch occupied seats", err);
-            }
-        };
 
         fetchAllOccupied();
         // Refresh every 30 seconds for live updates
         const interval = setInterval(fetchAllOccupied, 30000);
         return () => clearInterval(interval);
-    }, [event]);
+    }, [event?.categories, fetchAllOccupied]);
+
+    // 1.6 Fetch User Saved Locations
+    useEffect(() => {
+        if (!user) return;
+        const fetchSavedLocations = async () => {
+            try {
+                const res = await api.get(`/users/locations/${user.id}`);
+                setSavedLocations(res.data);
+            } catch (err) {
+                console.error("Failed to fetch saved locations", err);
+            }
+        };
+        fetchSavedLocations();
+    }, [user]);
 
     // 2. Location Logic
     const requestLocation = () => {
@@ -137,9 +153,9 @@ const EventDetail = () => {
                 showMessage(errorMsg, { type: 'error' });
             },
             {
-                enableHighAccuracy: false, // Use network location (faster, less accurate)
-                timeout: 10000, // 10 second timeout
-                maximumAge: 300000 // Accept cached position up to 5 minutes old
+                enableHighAccuracy: true, // Use GPS for better accuracy
+                timeout: 15000,
+                maximumAge: 0 // Force fresh location
             }
         );
     };
@@ -150,15 +166,14 @@ const EventDetail = () => {
 
         setLoadingAmenities(true);
         try {
-            // Overpass API query for parking and public transport within 1km
-            const radius = 1000; // meters
+            // Overpass API query for parking and public transport within 500m (optimized)
+            const radius = 500; // Reduced from 1000m to prevent timeouts
             const query = `
-                [out:json][timeout:25];
+                [out:json][timeout:10];
                 (
                   node(around:${radius},${lat},${lon})[amenity=parking];
                   node(around:${radius},${lat},${lon})[railway=station];
                   node(around:${radius},${lat},${lon})[railway=subway_entrance];
-                  node(around:${radius},${lat},${lon})[highway=bus_stop];
                 );
                 out body;
             `;
@@ -169,13 +184,15 @@ const EventDetail = () => {
             });
 
             if (!response.ok) {
-                console.warn(`Overpass API returned status ${response.status}`);
+                // Silently fail on timeout/server error to not alarm user
+                if (response.status !== 504 && response.status !== 503) {
+                    console.warn(`Overpass API info result: ${response.status}`);
+                }
                 return;
             }
 
             const contentType = response.headers.get("content-type");
             if (!contentType || !contentType.includes("application/json")) {
-                console.warn("Overpass API did not return JSON");
                 return;
             }
 
@@ -185,27 +202,29 @@ const EventDetail = () => {
             const parking = [];
             const transit = [];
 
-            data.elements.forEach(element => {
-                const item = {
-                    id: element.id,
-                    lat: element.lat,
-                    lon: element.lon,
-                    name: element.tags?.name || 'Unnamed',
-                    type: element.tags?.amenity || element.tags?.railway || element.tags?.highway
-                };
+            if (data && data.elements) {
+                data.elements.forEach(element => {
+                    const item = {
+                        id: element.id,
+                        lat: element.lat,
+                        lon: element.lon,
+                        name: element.tags?.name || 'Unnamed',
+                        type: element.tags?.amenity || element.tags?.railway
+                    };
 
-                if (element.tags?.amenity === 'parking') {
-                    parking.push({ ...item, capacity: element.tags?.capacity });
-                } else {
-                    transit.push(item);
-                }
-            });
+                    if (element.tags?.amenity === 'parking') {
+                        parking.push({ ...item, capacity: element.tags?.capacity });
+                    } else {
+                        transit.push(item);
+                    }
+                });
+            }
 
-            setNearbyParking(parking.slice(0, 5)); // Top 5 closest
-            setNearbyTransit(transit.slice(0, 5));
+            setNearbyParking(parking.slice(0, 3));
+            setNearbyTransit(transit.slice(0, 3));
 
         } catch (error) {
-            console.error('Failed to fetch amenities:', error);
+            // Ignore network errors for amenities
         } finally {
             setLoadingAmenities(false);
         }
@@ -219,58 +238,201 @@ const EventDetail = () => {
     }, [event, fetchNearbyAmenities]);
 
     // 3. Seat Layout Transformation (Memoized)
-    const seatLayout = useMemo(() => {
+    const { seatLayout, gapSeatIds } = useMemo(() => {
         let categoriesToRender = event?.categories;
-        if (!categoriesToRender || categoriesToRender.length === 0) {
+        if (!categoriesToRender || !Array.isArray(categoriesToRender) || categoriesToRender.length === 0) {
             categoriesToRender = [
                 { id: 'mock-vip', categoryName: 'VIP (Demo)', price: 1500, totalSeats: 20, availableSeats: 5, color: '#f59e0b' },
                 { id: 'mock-gen', categoryName: 'General (Demo)', price: 500, totalSeats: 60, availableSeats: 48, color: '#3b82f6' }
             ];
         }
 
-        return categoriesToRender.map((cat, catIndex) => {
-            const seatsPerRow = cat.totalSeats > 30 ? 12 : 8;
-            const effectiveTotalSeats = Number(cat.totalSeats || 0);
-            const effectiveAvailable = Number(cat.availableSeats ?? 0);
-            const totalRows = Math.ceil(effectiveTotalSeats / seatsPerRow);
-            const occupiedCount = Math.max(0, effectiveTotalSeats - effectiveAvailable);
-            let currentSeatIndex = 0;
-            const rows = [];
+        const collectedGapIds = [];
 
-            for (let r = 0; r < totalRows; r++) {
-                const rowId = String.fromCharCode(65 + r + (catIndex * 3));
-                const rowSeats = [];
-                for (let s = 1; s <= seatsPerRow; s++) {
-                    if (currentSeatIndex >= effectiveTotalSeats) break;
-                    // No longer simulating based on count - occupancy is handled via 'occupiedSeatIds' memo
-                    const seatId = `${cat.id}::${rowId}${s}`;
-                    rowSeats.push({ id: seatId, number: s, isOccupied: false });
-                    currentSeatIndex++;
+        // Generate full layout
+        const layout = categoriesToRender.map((cat, index) => {
+            const totalSeats = cat.totalSeats || 20;
+
+            // Calculate real available seats
+            const catOccupiedCount = occupiedSeatIdsFromServer.filter(id => id.startsWith(cat.id + '::')).length;
+            const calculatedAvailable = Math.max(0, totalSeats - catOccupiedCount);
+
+            // Generate seats split into rows (max 20 per row)
+            let rows = [];
+            let isCustomLayout = false;
+            let debugIndices = []; // DEBUG
+
+            // 1. Try to parse Admin-configured Rows (from arenaPosition)
+            // Use Regex for robustness against whitespace/casing mixed content
+            const rawPos = cat.arenaPosition || cat.arena_position;
+            const rowMatch = typeof rawPos === 'string' ? rawPos.match(/rows:([^;]+)/i) : null;
+            const colMatch = typeof rawPos === 'string' ? rawPos.match(/cols:(\d+)/i) : null;
+
+            if (rowMatch) {
+                try {
+                    const rowLabels = rowMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+                    const seatsPerRow = colMatch ? parseInt(colMatch[1]) : 20;
+
+                    let seatCounter = 1;
+
+                    // Parse row labels to indices logic for gap filling
+                    const parsedRows = rowLabels.map(l => {
+                        const label = l.trim();
+                        let index = parseInt(label);
+                        if (isNaN(index)) {
+                            // Try A-Z
+                            index = label.toUpperCase().charCodeAt(0) - 64;
+                        }
+                        return { label, index };
+                    }).sort((a, b) => a.index - b.index);
+
+                    debugIndices = parsedRows.map(p => p.index); // DEBUG POPULATE
+
+                    // Check if labels appear to be 1-based indices for A-Z
+                    // If all labels are numeric and <= 26, we act as if they are A-Z indices
+                    const autoConvertNumericToAlpha = parsedRows.every(p => !isNaN(parseInt(p.label)) && p.index <= 26);
+
+                    if (parsedRows.length > 0) {
+                        const minRow = 1; // Always start from Row A (Index 1)
+                        const maxRow = parsedRows[parsedRows.length - 1].index;
+
+                        for (let r = minRow; r <= maxRow; r++) {
+                            // Is this row in the config?
+                            const config = parsedRows.find(p => p.index === r);
+
+                            // Determine row label
+                            let currentLabel = config ? config.label : (
+                                // Reconstruct label if missing (default fallback)
+                                String.fromCharCode(64 + r)
+                            );
+
+                            if (autoConvertNumericToAlpha) {
+                                currentLabel = String.fromCharCode(64 + r);
+                            } else if (!config && !isNaN(parseInt(parsedRows[0].label))) {
+                                // Keep numeric if origin was numeric and > 26
+                                currentLabel = String(r);
+                            }
+
+                            const rowSeats = [];
+                            for (let c = 1; c <= seatsPerRow; c++) {
+                                const isGapRow = !config;
+
+                                // SVG Map expects: categoryId::RowLabelColNumber (e.g. uuid::A1)
+                                const seatNumberLabel = `${currentLabel}${c}`;
+                                const fullId = `${cat.id}::${seatNumberLabel}`;
+
+                                rowSeats.push({
+                                    id: fullId,
+                                    number: c,
+                                    status: isGapRow ? 'occupied' : 'available',
+                                    isGap: isGapRow // Helper for UI
+                                });
+
+                                if (isGapRow) collectedGapIds.push(fullId);
+                                if (config) seatCounter++;
+                            }
+
+                            // Add row if it has seats (valid or gap)
+                            if (rowSeats.length > 0) {
+                                rows.push({
+                                    id: `row-${cat.id}-${currentLabel}`,
+                                    rowId: currentLabel,
+                                    seats: rowSeats
+                                });
+                            }
+                        }
+                    } // End of parsedRows logic
+
+                    if (rows.length > 0) isCustomLayout = true;
+                } catch (e) {
+                    console.warn("Failed to parse row config", e);
                 }
-                rows.push({ rowId, seats: rowSeats });
             }
+
+            // 2. Fallback: Generate generic rows if no custom config found
+            if (!isCustomLayout) {
+                const seatsPerRow = 20;
+                const rowCount = Math.ceil(totalSeats / seatsPerRow);
+
+                for (let r = 0; r < rowCount; r++) {
+                    const rowSeats = [];
+                    const startSeat = r * seatsPerRow + 1;
+                    const endSeat = Math.min(startSeat + seatsPerRow - 1, totalSeats);
+                    const rowLabel = String.fromCharCode(65 + r);
+
+                    for (let i = startSeat; i <= endSeat; i++) {
+                        const colNum = (i - startSeat) + 1;
+                        const fullId = `${cat.id}::${rowLabel}${colNum}`;
+                        rowSeats.push({
+                            id: fullId,
+                            number: colNum,
+                            status: 'available'
+                        });
+                    }
+
+                    rows.push({
+                        id: `row-${cat.id}-${r}`,
+                        rowId: rowLabel,
+                        seats: rowSeats
+                    });
+                }
+            }
+
             return {
+                id: cat.id,
                 categoryName: cat.categoryName,
-                price: cat.price,
-                rows,
-                categoryId: cat.id,
-                color: cat.color
+                name: cat.categoryName,
+                availableSeats: cat.availableSeats !== undefined ? cat.availableSeats : calculatedAvailable,
+                price: cat.price || 500,
+                color: cat.color || '#3b82f6',
+                rows: rows,
+                isCustom: isCustomLayout,
+                debugIndices: debugIndices
             };
         });
-    }, [event]);
 
-    // 4. Booking Handling
-    const handleSeatClick = (seatId) => {
-        setSelectedSeatIds(prev => prev.includes(seatId) ? prev.filter(id => id !== seatId) : [...prev, seatId]);
+        return { seatLayout: layout, gapSeatIds: collectedGapIds };
+    }, [event?.categories, event?.eventSubType, occupiedSeatIdsFromServer]);
+
+    const handleSeatClick = (seatId, mode = 'toggle') => {
+        const [newCatId] = seatId.split('::');
+
+        setSelectedSeatIds(prev => {
+            // If in single-zone mode (Best Available), we typically only want seats from ONE category at a time
+            if (mode === 'single-zone') {
+                const hasDifferentCategory = prev.length > 0 && prev.some(id => id.split('::')[0] !== newCatId);
+                if (hasDifferentCategory) {
+                    // Switch to the new category entirely
+                    return [seatId];
+                }
+            }
+
+            // Normal Toggle Behavior
+            if (prev.includes(seatId)) {
+                return prev.filter(id => id !== seatId);
+            } else {
+                return [...prev, seatId];
+            }
+        });
     };
 
     const handleBook = async () => {
-        if (!user) return navigate('/login');
-        if (selectedSeatIds.length === 0) return showMessage('Select at least one seat.', { type: 'info' });
+        if (!user) {
+            // Redirect to login but store intent
+            navigate('/login');
+            // optionally save pending booking
+            return;
+        }
 
+        if (selectedSeatIds.length === 0) {
+            showMessage("Please select at least one seat.", { type: 'error' });
+            return;
+        }
+
+        // Aggregate by category
         const bookingsByCat = {};
         selectedSeatIds.forEach(id => {
-            const catId = id.split('::')[0];
+            const [catId] = id.split('::');
             bookingsByCat[catId] = (bookingsByCat[catId] || 0) + 1;
         });
 
@@ -307,10 +469,11 @@ const EventDetail = () => {
     };
 
     // Calculation (Standardized tiered logic)
-    const currentPrice = selectedSeatIds.reduce((total, seatId) => {
+    const currentPrice = (selectedSeatIds || []).reduce((total, seatId) => {
         const catId = seatId.split('::')[0];
-        const category = seatLayout.find(c => c.categoryId === catId);
-        return total + (category ? Number(category.price) : 0);
+        const category = seatLayout.find(c => String(c.id) === String(catId));
+        const price = category ? Number(category.price) : 0;
+        return total + (isNaN(price) ? 0 : price);
     }, 0);
 
     const qty = selectedSeatIds.length;
@@ -325,363 +488,292 @@ const EventDetail = () => {
 
     // Compute occupied seats list
     const occupiedSeatIds = useMemo(() => {
-        // Use the real IDs fetched from the server
-        return occupiedSeatIdsFromServer;
-    }, [occupiedSeatIdsFromServer]);
+        // COMBINED: Actual bookings + Generated gaps for visual blocking on SVG
+        return [...occupiedSeatIdsFromServer, ...gapSeatIds];
+    }, [occupiedSeatIdsFromServer, gapSeatIds]);
 
 
     if (loading) return <div className="flex justify-center items-center min-h-screen text-slate-400 font-medium">Loading event...</div>;
     if (!event) return <div className="text-center py-20 text-slate-500">Event not found.</div>;
 
     return (
-        <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-900">
-            {/* 1. Navbar / Header */}
-            <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
-                <div className="container mx-auto max-w-7xl px-4 h-16 flex items-center justify-between">
-                    <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">
-                        <span className="text-lg">←</span> Back
+        <div className="min-h-screen bg-slate-50/50 pb-24 font-sans text-slate-900">
+            {/* 1. Navbar (Absolute Positioning for Reliability) */}
+            <div className="bg-white/95 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-30 h-14 w-full shadow-sm">
+                <div className="relative w-full h-full flex items-center justify-center container mx-auto px-4 max-w-5xl">
+                    {/* Left: Back Button (Absolute & Protected) */}
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 p-2 hover:bg-slate-100 rounded-full text-slate-800 transition-colors z-20 border border-slate-100 shadow-sm bg-white"
+                        aria-label="Go back"
+                    >
+                        <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <div className="text-center">
-                        <h1 className="text-base font-bold text-slate-900 leading-tight">{event.name}</h1>
-                        <p className="text-xs text-slate-500">{new Date(event.eventDate).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} • {event.eventType || 'Event'}</p>
+
+                    {/* Center: Title (Constrained width) */}
+                    <div className="flex flex-col items-center max-w-[60%]">
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-sm font-bold text-slate-900 leading-tight truncate w-full text-center">{event.name}</h1>
+                            {new Date(event.eventDate) < new Date() && (
+                                <span className="bg-slate-200 text-slate-600 text-[8px] px-1.5 py-0.5 rounded font-black uppercase">Ended</span>
+                            )}
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-medium truncate w-full text-center opacity-80">
+                            {new Date(event.eventDate).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })} • {event.locationName || event.venue}
+                        </span>
                     </div>
-                    <div className="w-16"></div> {/* Spacer */}
                 </div>
             </div>
 
-            <main className="container mx-auto max-w-7xl px-4 py-8">
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 items-start">
+            <main className="container mx-auto max-w-5xl px-4 py-6 space-y-6">
 
-                    {/* LEFT COLUMN: SEATS + MAP */}
-                    <div className="space-y-8">
-
-                        {/* A. Arena / Seats */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="p-6 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
-                                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                                    <TicketIcon className="w-4 h-4" /> Select Seats
-                                </h2>
-                                <div className="flex gap-4">
-                                    <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-700"></span><span className="text-xs text-slate-500">Sold</span></div>
-                                    <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-800 border border-slate-700"></span><span className="text-xs text-slate-500">Available</span></div>
-                                    <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span><span className="text-xs text-slate-500">Selected</span></div>
-                                </div>
-                            </div>
-
-                            <div className="p-6 sm:p-10 bg-slate-900 min-h-[400px] flex justify-center">
-                                {/* Dark themed stage area */}
-                                <SeatSelection
-                                    layout={seatLayout}
-                                    selectedSeats={selectedSeatIds}
-                                    occupiedSeats={occupiedSeatIds}
-                                    onSeatSelect={handleSeatClick}
-                                    className="bg-transparent"
-                                />
-                            </div>
-                        </div>
-
-                        {/* B. Venue & Directions (Moved Here) */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-1">
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-0 overflow-hidden rounded-xl">
-                                {/* Controls */}
-                                <div className="md:col-span-5 p-6 bg-white flex flex-col justify-between space-y-6">
-                                    <div>
-                                        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2 mb-4">
-                                            <Navigation className="w-4 h-4" /> Get Directions
-                                        </h2>
-
-                                        {/* Inputs */}
-                                        <div className="space-y-3 relative">
-                                            <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                                <div className="w-2 h-2 bg-blue-500 rounded-full shrink-0"></div>
-                                                <input
-                                                    className="bg-transparent border-none outline-none text-sm w-full font-medium"
-                                                    placeholder="Enter city or address"
-                                                    value={manualLoc || (userLoc ? "Current Location" : "")}
-                                                    onChange={(e) => { setManualLoc(e.target.value); setUserLoc(null); }}
-                                                    onKeyDown={async (e) => {
-                                                        if (e.key === 'Enter' && manualLoc) {
-                                                            try {
-                                                                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(manualLoc)}`);
-                                                                const data = await res.json();
-                                                                if (data && data.length > 0) {
-                                                                    const newLoc = { latitude: parseFloat(data[0].lat), longitude: parseFloat(data[0].lon) };
-                                                                    setUserLoc(newLoc);
-                                                                    setMapCenter({ ...newLoc, zoom: 14 }); // Zoom to searched location
-                                                                    showMessage("Location found!", { type: 'success' });
-                                                                } else {
-                                                                    showMessage("Location not found. Try a different search.", { type: 'error' });
-                                                                }
-                                                            } catch (err) {
-                                                                showMessage("Search failed. Please try again.", { type: 'error' });
-                                                            }
-                                                        }
-                                                    }}
-                                                />
-                                                <button
-                                                    onClick={requestLocation}
-                                                    className="p-1.5 rounded-md hover:bg-white text-slate-400 hover:text-blue-600 transition-colors"
-                                                    title="Use my location"
-                                                >
-                                                    <LocateFixed className="w-4 h-4" />
-                                                </button>
-                                            </div>
-
-                                            {/* Dotted Line */}
-                                            <div className="absolute left-[19px] top-8 bottom-8 w-px border-l border-dashed border-slate-300"></div>
-
-                                            <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                                <MapPin className="w-3 h-3 text-red-500 shrink-0" />
-                                                <div className="text-sm font-semibold text-slate-900 truncate">{event.locationName || event.venue || "Event Venue"}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Modes */}
-                                    <div className="space-y-4">
-                                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Transport Mode</p>
-                                        <div className="flex gap-2">
-                                            <TransportMode label="Car" icon={Car} active={transportMode === 'driving'} onClick={() => setTransportMode('driving')} />
-                                            <TransportMode label="Bike" icon={Bike} active={transportMode === 'cycling'} onClick={() => setTransportMode('cycling')} />
-                                            <TransportMode label="Walk" icon={Footprints} active={transportMode === 'walking'} onClick={() => setTransportMode('walking')} />
-                                        </div>
-                                    </div>
-
-                                    {/* Stats */}
-                                    {routeStats && (
-                                        <div className="bg-slate-900 text-white p-4 rounded-xl flex items-center justify-between">
-                                            <div>
-                                                <div className="text-2xl font-bold leading-none">{(routeStats.duration / 60).toFixed(0)} <span className="text-sm font-normal text-slate-400">min</span></div>
-                                                <div className="text-xs text-slate-400 mt-1">Fastest route</div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-lg font-semibold">{(routeStats.distance / 1000).toFixed(1)} km</div>
-                                                <div className="text-xs text-slate-400">Distance</div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Map */}
-                                <div className="md:col-span-7 h-[300px] md:h-auto bg-slate-100 relative min-h-[350px]">
-                                    <Map
-                                        initialViewState={{
-                                            longitude: mapCenter?.longitude || Number(event.longitude) || 78.9629,
-                                            latitude: mapCenter?.latitude || Number(event.latitude) || 20.5937,
-                                            zoom: mapCenter?.zoom || 13
-                                        }}
-                                        className="w-full h-full"
-                                        onClick={(coords) => {
-                                            setUserLoc({ latitude: coords.latitude, longitude: coords.longitude });
-                                            setMapCenter({ latitude: coords.latitude, longitude: coords.longitude, zoom: 14 });
-                                            setManualLoc(''); // Clear manual input
-                                            showMessage("Starting location set on map", { type: 'success' });
-                                        }}
-                                    >
-                                        <Marker longitude={Number(event.longitude) || 78.9629} latitude={Number(event.latitude) || 20.5937} />
-                                        {userLoc && (
-                                            <>
-                                                <Marker longitude={userLoc.longitude} latitude={userLoc.latitude}>
-                                                    <div className="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg relative">
-                                                        <div className="absolute -inset-1 bg-blue-500/30 rounded-full animate-ping"></div>
-                                                    </div>
-                                                </Marker>
-                                                <MapRoute
-                                                    from={{ lng: userLoc.longitude, lat: userLoc.latitude }}
-                                                    to={{ lng: event.longitude, lat: event.latitude }}
-                                                    profile={transportMode === 'cycling' ? 'driving' : transportMode === 'walking' ? 'foot' : 'driving'} // Adjust mapping for OSRM
-                                                    onRouteStats={handleRouteStats}
-                                                />
-                                            </>
-                                        )}
-
-                                        {/* Parking & Transit Markers */}
-                                        {nearbyParking.slice(0, 3).map((spot) => (
-                                            <Marker key={`p-${spot.id}`} longitude={spot.lon} latitude={spot.lat}>
-                                                <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center shadow">
-                                                    <ParkingSquare className="w-3 h-3 text-white" />
-                                                </div>
-                                            </Marker>
-                                        ))}
-                                        {nearbyTransit.slice(0, 3).map((stop) => (
-                                            <Marker key={`t-${stop.id}`} longitude={stop.lon} latitude={stop.lat}>
-                                                <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center shadow">
-                                                    <Train className="w-3 h-3 text-white" />
-                                                </div>
-                                            </Marker>
-                                        ))}
-
-                                        {/* Hint overlay when no location set */}
-                                        {!userLoc && (
-                                            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                                                <div className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-lg border border-slate-200">
-                                                    <p className="text-xs font-medium text-slate-700 flex items-center gap-2">
-                                                        <MapPin className="w-3 h-3" />
-                                                        Click on map to set your location
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </Map>
-                                </div>
-                            </div>
-                        </div>
+                {/* Event Info Card (New) */}
+                <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col md:flex-row gap-6">
+                    {/* Left: Event Image */}
+                    <div className="w-full md:w-1/3 aspect-[3/4] md:aspect-auto md:h-80 overflow-hidden bg-slate-100 shrink-0">
+                        <img
+                            src={
+                                (typeof event.imageUrl === 'string' && event.imageUrl.startsWith('http'))
+                                    ? event.imageUrl
+                                    : getDefaultEventImage(event.eventType)
+                            }
+                            alt={event.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                e.target.onerror = null; // Prevent infinite loops
+                                e.target.src = getDefaultEventImage(event.eventType);
+                            }}
+                        />
                     </div>
 
-                    {/* RIGHT COLUMN: BOOKING SUMMARY */}
-                    <div className="lg:sticky lg:top-24 space-y-6">
-                        <div className="bg-white rounded-3xl shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-                            <div className="px-6 py-6 border-b border-slate-50">
-                                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Booking Summary</h2>
-                            </div>
-
-                            {selectedSeatIds.length > 0 ? (
-                                <div className="p-6 space-y-6 animate-in fade-in duration-500">
-                                    {/* Item List */}
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center group">
-                                            <span className="text-sm text-slate-500 font-medium">{selectedSeatIds.length} x Tickets</span>
-                                            <span className="font-bold text-slate-900">
-                                                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(currentPrice)}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center group">
-                                            <span className="text-sm text-slate-500 font-medium">Convenience Fee</span>
-                                            <span className="font-bold text-slate-900">
-                                                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(convenienceFee)}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-xs font-semibold text-slate-400 italic">Tax (18% GST on Fee)</span>
-                                            <span className="text-xs font-bold text-slate-400">
-                                                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(gst)}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Divider */}
-                                    <div className="h-px bg-slate-100"></div>
-
-                                    {/* Total Payable */}
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <span className="block text-sm font-bold text-slate-950">Amount Payable</span>
-                                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Including all taxes</span>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-3xl font-black text-slate-950 tracking-tighter">
-                                                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalPayable)}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Seats Section */}
-                                    <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Selected Seats</p>
-                                            <span className="text-[10px] font-bold bg-white text-slate-600 px-2 py-0.5 rounded-full border border-slate-100">
-                                                {selectedSeatIds.length} Total
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {selectedSeatIds.map(id => (
-                                                <span key={id} className="min-w-[40px] h-9 flex items-center justify-center text-xs font-bold bg-white border border-slate-200 text-slate-900 rounded-xl shadow-sm">
-                                                    {id.split('::')[1]}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Action Button */}
-                                    <div className="pt-2">
-                                        <button
-                                            onClick={handleBook}
-                                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold h-14 rounded-2xl shadow-xl shadow-slate-900/10 transition-all hover:scale-[1.01] active:scale-[0.98] flex items-center justify-center gap-3 group"
-                                        >
-                                            <span className="text-sm">Proceed to Checkout</span>
-                                            <span className="text-lg transition-transform group-hover:translate-x-1">→</span>
-                                        </button>
-                                        <div className="flex items-center justify-center gap-2 mt-4 opacity-50">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                                            <p className="text-[10px] text-slate-600 font-medium">Safe & Secure Payment</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="p-12 text-center">
-                                    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-100">
-                                        <TicketIcon className="w-8 h-8 text-slate-200" />
-                                    </div>
-                                    <h3 className="text-sm font-bold text-slate-900">Your cart is empty</h3>
-                                    <p className="text-xs text-slate-500 mt-2 max-w-[200px] mx-auto leading-relaxed">Select your preferred seats from the arena to proceed.</p>
-                                </div>
+                    {/* Right: Info */}
+                    <div className="flex-1 p-6 md:pl-0 flex flex-col justify-center">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="px-2.5 py-1 bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider rounded-lg">
+                                {event.eventType || 'Event'}
+                            </span>
+                            {event.eventSubType && (
+                                <span className="px-2.5 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider rounded-lg">
+                                    {event.eventSubType}
+                                </span>
                             )}
                         </div>
-
-                        {/* Additional Info */}
-                        <div className="bg-slate-100 p-5 rounded-xl">
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Important Info</h3>
-                            <ul className="text-xs text-slate-600 space-y-2 list-disc pl-4">
-                                <li>Tickets are non-refundable.</li>
-                                <li>Entry allowed only 30 mins before show.</li>
-                                <li>Carry a valid ID proof.</li>
-                            </ul>
+                        <h1 className="text-3xl font-black text-slate-900 mb-4 tracking-tight leading-tight">
+                            {event.name}
+                        </h1>
+                        <div className="space-y-3 mb-6">
+                            <div className="flex items-start gap-3 text-slate-600">
+                                <Calendar className="w-4 h-4 mt-0.5 text-primary" />
+                                <div className="text-sm">
+                                    <span className="font-bold">{new Date(event.eventDate).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                    <div className="text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                        <Clock className="w-3.5 h-3.5" />
+                                        {new Date(event.eventDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3 text-slate-600">
+                                <MapPin className="w-4 h-4 mt-0.5 text-red-500" />
+                                <div className="text-sm">
+                                    <span className="font-bold">{event.locationName || 'Venue'}</span>
+                                    <div className="text-slate-500 mt-0.5">{event.locationAddress || 'Address not provided'}</div>
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Nearby Amenities */}
-                        {(nearbyParking.length > 0 || nearbyTransit.length > 0) && (
-                            <div className="space-y-4">
-                                {/* Parking */}
-                                {nearbyParking.length > 0 && (
-                                    <div className="bg-white p-5 rounded-xl border border-slate-200">
-                                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                            <ParkingSquare className="w-4 h-4" />
-                                            Nearby Parking
-                                        </h3>
-                                        <div className="space-y-2">
-                                            {nearbyParking.map((spot, idx) => (
-                                                <div key={spot.id} className="flex items-start gap-2 text-xs">
-                                                    <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-[10px] shrink-0">
-                                                        {idx + 1}
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <p className="font-medium text-slate-900">{spot.name}</p>
-                                                        {spot.capacity && <p className="text-slate-500 text-[10px]">{spot.capacity} spots</p>}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Public Transport */}
-                                {nearbyTransit.length > 0 && (
-                                    <div className="bg-white p-5 rounded-xl border border-slate-200">
-                                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                            <Train className="w-4 h-4" />
-                                            Public Transport
-                                        </h3>
-                                        <div className="space-y-2">
-                                            {nearbyTransit.map((stop, idx) => (
-                                                <div key={stop.id} className="flex items-start gap-2 text-xs">
-                                                    <div className="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold text-[10px] shrink-0">
-                                                        {idx + 1}
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <p className="font-medium text-slate-900">{stop.name}</p>
-                                                        <p className="text-slate-500 text-[10px] capitalize">{stop.type.replace('_', ' ')}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                        {event.description && (
+                            <div className="pt-6 border-t border-slate-100">
+                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">About Event</h3>
+                                <p className="text-sm text-slate-600 leading-relaxed line-clamp-4">
+                                    {event.description}
+                                </p>
                             </div>
                         )}
                     </div>
+                </section>
 
+                {/* 2. Seat Selection Card (Cleaner, focused) */}
+                <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Choose Your Zone</h2>
+                        <div className="flex gap-3 text-[10px] font-medium text-slate-500">
+                            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-200"></span>Sold</span>
+                            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-800"></span>Avail</span>
+                            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-600"></span>Selected</span>
+                        </div>
+                    </div>
+
+                    <div className="p-4">
+                        {new Date(event.eventDate) < new Date() ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+                                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
+                                    <Clock className="w-8 h-8" />
+                                </div>
+                                <h3 className="text-lg font-bold text-slate-900 mb-1">Event has Ended</h3>
+                                <p className="text-sm text-slate-500 max-w-[250px]">
+                                    This event has already finished and is no longer available for booking.
+                                </p>
+                            </div>
+                        ) : (
+                            <SeatSelection
+                                layout={seatLayout}
+                                selectedSeats={selectedSeatIds}
+                                occupiedSeats={occupiedSeatIds}
+                                onSeatSelect={handleSeatClick}
+                                className="bg-transparent"
+                                eventType={event.eventType}
+                                eventSubType={event.eventSubType}
+                                layoutVariant={event.seatingLayoutVariant}
+                            />
+                        )}
+                    </div>
+                </section>
+
+                {/* Info Note */}
+                <div className="flex items-start gap-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100 text-xs text-slate-600">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0"></div>
+                    <p>Tickets are zone-based. You will be assigned the best available seat in your selected category automatically.</p>
                 </div>
+
+                {/* 3. Journey Map (Restored & Simplified) */}
+                <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                            <Navigation className="w-4 h-4" /> Venue & Directions
+                        </h2>
+                    </div>
+                    <div className="h-[300px] relative">
+                        <Map
+                            initialViewState={{
+                                longitude: mapCenter?.longitude || (Number(event.longitude) || 77.5946),
+                                latitude: mapCenter?.latitude || (Number(event.latitude) || 12.9716),
+                                zoom: 13
+                            }}
+                            className="w-full h-full"
+                        >
+                            <Marker longitude={(Number(event.longitude) || 77.5946)} latitude={(Number(event.latitude) || 12.9716)}>
+                                <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-xl border-2 border-white">
+                                    <MapPin className="w-4 h-4" />
+                                </div>
+                            </Marker>
+                            {userLoc && (
+                                <Marker longitude={userLoc.longitude} latitude={userLoc.latitude}>
+                                    <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg animate-pulse"></div>
+                                </Marker>
+                            )}
+                            {userLoc && (
+                                <MapRoute
+                                    from={{ lng: userLoc.longitude, lat: userLoc.latitude }}
+                                    to={{ lng: (Number(event.longitude) || 77.5946), lat: (Number(event.latitude) || 12.9716) }}
+                                    profile={transportMode}
+                                    onRouteStats={setRouteStats}
+                                />
+                            )}
+                        </Map>
+
+                        {/* Search Overlay */}
+                        <div className="absolute top-4 left-4 right-4 flex flex-col gap-2">
+                            <div className="bg-white/95 backdrop-blur rounded-xl shadow-lg border border-white/50 p-2 flex items-center gap-2">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full ml-2"></div>
+                                <input
+                                    className="bg-transparent w-full text-xs font-medium outline-none"
+                                    placeholder="Enter start location..."
+                                    value={manualLoc}
+                                    onChange={(e) => setManualLoc(e.target.value)}
+                                    onKeyDown={async (e) => {
+                                        if (e.key === 'Enter' && manualLoc) {
+                                            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(manualLoc)}`);
+                                            const data = await res.json();
+                                            if (data?.[0]) {
+                                                const newLoc = { latitude: parseFloat(data[0].lat), longitude: parseFloat(data[0].lon) };
+                                                setUserLoc(newLoc); setMapCenter(newLoc);
+                                            }
+                                        }
+                                    }}
+                                />
+                                <button onClick={requestLocation} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                                    <LocateFixed className="w-3 h-3 text-slate-500" />
+                                </button>
+                            </div>
+
+                            {/* Saved Locations Chips */}
+                            {savedLocations.length > 0 && (
+                                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none no-scrollbar">
+                                    {savedLocations.map(loc => (
+                                        <button
+                                            key={loc.id}
+                                            onClick={() => {
+                                                const newLoc = { latitude: loc.latitude, longitude: loc.longitude };
+                                                setUserLoc(newLoc);
+                                                setMapCenter({ ...newLoc, zoom: 14 });
+                                                setManualLoc(loc.address);
+                                            }}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur rounded-full border border-white/50 shadow-sm text-[10px] font-bold text-slate-700 hover:bg-white transition-all whitespace-nowrap"
+                                        >
+                                            {loc.label === 'Home' && <Home className="w-3 h-3 text-blue-500" />}
+                                            {loc.label === 'Work' && <Briefcase className="w-3 h-3 text-emerald-500" />}
+                                            {loc.label === 'Hostel' && <School className="w-3 h-3 text-orange-500" />}
+                                            {loc.label !== 'Home' && loc.label !== 'Work' && loc.label !== 'Hostel' && <MapPin className="w-3 h-3 text-rose-500" />}
+                                            {loc.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Navigation Docks (Transport Modes) */}
+                    <div className="p-4 bg-slate-50/50 flex flex-wrap gap-4 items-center justify-center border-t border-slate-100">
+                        <div className="flex gap-2">
+                            <TransportMode icon={Car} label="Drive" active={transportMode === 'driving'} onClick={() => setTransportMode('driving')} />
+                            <TransportMode icon={Bike} label="Bike" active={transportMode === 'cycling'} onClick={() => setTransportMode('cycling')} />
+                            <TransportMode icon={Footprints} label="Walk" active={transportMode === 'walking'} onClick={() => setTransportMode('walking')} />
+                        </div>
+                        {routeStats && (
+                            <div className="pl-4 border-l border-slate-200">
+                                <div className="text-xl font-bold text-slate-900">
+                                    {Math.round(routeStats.duration / 60) >= 60
+                                        ? `${Math.floor(Math.round(routeStats.duration / 60) / 60)} hr ${Math.round(routeStats.duration / 60) % 60} min`
+                                        : `${Math.round(routeStats.duration / 60)} min`
+                                    }
+                                </div>
+                                <div className="text-xs text-slate-500">{(routeStats.distance / 1000).toFixed(1)} km away</div>
+                            </div>
+                        )}
+                    </div>
+                </section>
             </main>
+
+            {/* 4. Floating Checkout Dock */}
+            <div className={cn(
+                "fixed bottom-6 left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-2xl bg-slate-900/90 backdrop-blur-md text-white shadow-2xl rounded-2xl p-1 z-50 transition-all duration-500 border border-white/10",
+                selectedSeatIds.length > 0 ? "translate-y-0 opacity-100" : "translate-y-[150%] opacity-0"
+            )}>
+                <div className="flex items-center justify-between pl-6 pr-2 py-2">
+                    <div className="flex flex-col">
+                        <div className="flex items-center gap-3">
+                            <div className="text-xl font-bold">
+                                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalPayable)}
+                            </div>
+                            <div className="h-4 w-px bg-white/20"></div>
+                            <div className="text-sm font-medium text-slate-300">
+                                {selectedSeatIds.length} Ticket{selectedSeatIds.length !== 1 ? 's' : ''}
+                            </div>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-medium">
+                            {selectedSeatIds.map(id => id.split('::')[1]).join(', ')}
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={handleBook}
+                        className="bg-white text-black hover:bg-slate-100 px-6 h-10 rounded-xl font-bold text-xs transition-all flex items-center gap-2 group"
+                    >
+                        <span>Proceed</span>
+                        <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };

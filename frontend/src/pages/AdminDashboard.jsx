@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api/axios';
+import { useExtendedAlert, ExtendedAlert } from '@/components/ui/extended-alert';
 import { useMessage } from '../context/MessageContext';
 import { DropdownCalendar } from '@/components/ui/dropdown-calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -17,9 +18,30 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Map, Marker } from '@/components/ui/map';
+import { VenueVisuals } from '@/components/ui/venue-svgs';
+import { ZoneConfigDialog } from '@/components/ui/zone-config-dialog';
+import { RowSelectionOverlay } from '@/components/ui/row-selection-overlay';
+import { RowSelectionDialog } from '@/components/ui/row-selection-dialog';
+import { ImageUpload } from '@/components/ui/image-upload';
+import { useFileInput } from '@/hooks/use-file-input';
+import { supabase } from '@/lib/supabase';
+import { EVENT_TYPES, EVENT_SUBTYPES, LAYOUT_VARIANTS, getLayoutsForSubtype } from '@/lib/venue-config';
+import { getCategoriesForSport } from '@/lib/stadium-categories';
+import { autoPopulateZoneConfigs, getConfiguredZonesCount, getTotalZonesCount } from '@/lib/stadium-zone-mapping';
 
-const SEAT_CATEGORIES = [
+// Legacy categories for non-stadium events (Theatre, Concert, etc.)
+const LEGACY_SEAT_CATEGORIES = [
     { name: "General Admission", color: "#22C55E" },
     { name: "Standard", color: "#3B82F6" },
     { name: "Silver", color: "#9CA3AF" },
@@ -32,6 +54,186 @@ const SEAT_CATEGORIES = [
     { name: "Balcony", color: "#64748B" },
 ];
 
+const ASPECT_RATIOS = [
+    { id: 'poster', label: 'Poster', ratio: '2/3', className: 'aspect-[2/3]' },
+    { id: 'square', label: 'Square', ratio: '1/1', className: 'aspect-square' },
+    { id: 'landscape', label: 'Landscape', ratio: '16/9', className: 'aspect-video' },
+];
+
+import { CropImageDialog } from '@/components/ui/crop-image-modal';
+
+const EventImageUpload = ({ value, onChange, aspectRatio = '2/3', onAspectRatioChange }) => {
+    const {
+        fileName,
+        error,
+        fileInputRef,
+        handleFileSelect,
+        fileSize,
+        clearFile,
+        file
+    } = useFileInput({
+        accept: "image/*",
+        maxSize: 5
+    });
+
+    const [previewUrl, setPreviewUrl] = React.useState(value);
+    const [cropOpen, setCropOpen] = React.useState(false);
+    const [cropImage, setCropImage] = React.useState(null);
+    const [uploading, setUploading] = React.useState(false);
+
+    // Update preview when value changes
+    React.useEffect(() => {
+        if (!file) {
+            setPreviewUrl(value);
+        }
+    }, [value, file]);
+
+    // Handle file selection - open cropper
+    React.useEffect(() => {
+        if (file) {
+            const objectUrl = URL.createObjectURL(file);
+            setCropImage(objectUrl);
+            setCropOpen(true);
+            return () => URL.revokeObjectURL(objectUrl);
+        }
+    }, [file]);
+
+    const handleCropComplete = async (croppedBlob) => {
+        if (!croppedBlob) return;
+        setUploading(true);
+        try {
+            console.log("Starting upload for cropped file");
+            const fileExt = "jpg"; // Cropper output is jpeg
+            const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+            const filePath = `event-posters/${fileName}`;
+
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('event-images')
+                .upload(filePath, croppedBlob, {
+                    contentType: 'image/jpeg'
+                });
+
+            if (uploadError) {
+                console.error("Supabase upload error:", uploadError);
+                throw uploadError;
+            }
+
+            const { data } = supabase.storage
+                .from('event-images')
+                .getPublicUrl(filePath);
+
+            console.log("Public URL generated:", data.publicUrl);
+            onChange(data.publicUrl);
+            setPreviewUrl(data.publicUrl); // Show new image immediately
+
+            // We keep 'file' state in hook but we have processed it. 
+            // If we clearFile(), 'file' becomes null. 
+            // Effect above depends on 'file'. If null, nothing happens.
+            // We should clear it to allow selecting same file again if needed or just cleanup.
+            clearFile();
+
+        } catch (error) {
+            console.error('Error uploading event poster:', error);
+            clearFile();
+        } finally {
+            setUploading(false);
+            setCropOpen(false);
+        }
+    };
+
+    const handleCropCancel = () => {
+        setCropOpen(false);
+        setCropImage(null);
+        clearFile();
+    };
+
+    const handleClear = () => {
+        clearFile();
+        onChange('');
+        setPreviewUrl('');
+    };
+
+    return (
+        <div className="space-y-4">
+            <CropImageDialog
+                open={cropOpen}
+                onOpenChange={(open) => {
+                    if (!open) handleCropCancel();
+                }}
+                imageUrl={cropImage}
+                aspectRatio={aspectRatio}
+                onAspectRatioChange={onAspectRatioChange}
+                onCropComplete={handleCropComplete}
+            />
+
+            <div className="flex gap-4 items-center">
+                <Button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    variant="outline"
+                    disabled={uploading}
+                >
+                    {uploading ? 'Uploading...' : 'Select Image'}
+                </Button>
+                {(fileName || previewUrl) && (
+                    <Button
+                        type="button"
+                        onClick={handleClear}
+                        variant="ghost"
+                        size="sm"
+                    >
+                        Clear
+                    </Button>
+                )}
+            </div>
+
+            <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+            />
+
+            {(fileName || previewUrl) && (
+                <div className="space-y-4">
+                    {previewUrl && (
+                        <div className={cn(
+                            "relative w-full rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-sm transition-all duration-300 ease-in-out mx-auto",
+                            aspectRatio === '2/3' && "aspect-[2/3] max-w-sm",
+                            aspectRatio === '1/1' && "aspect-square max-w-sm",
+                            aspectRatio === '16/9' && "aspect-video w-full"
+                        )}>
+                            <img
+                                src={previewUrl}
+                                alt="Preview"
+                                className="w-full h-full object-cover"
+                                crossOrigin="anonymous"
+                            />
+                        </div>
+                    )}
+
+
+
+                    <div className="space-y-1">
+                        {fileName && <p className="text-sm text-muted-foreground">
+                            Original: {fileName}
+                        </p>}
+                        {fileSize > 0 && <p className="text-sm text-muted-foreground">
+                            Size: {(fileSize / (1024 * 1024)).toFixed(2)}MB
+                        </p>}
+                    </div>
+                </div>
+            )}
+            {error && (
+                <p className="text-sm text-red-500">
+                    Error: {error}
+                </p>
+            )}
+        </div>
+    );
+};
+
 const AdminDashboard = () => {
     const [events, setEvents] = useState([]);
     const [newEvent, setNewEvent] = useState({
@@ -41,27 +243,69 @@ const AdminDashboard = () => {
         eventType: '',
         locationName: '',
         locationAddress: '',
-        latitude: 20.5937, // Default India Center
-        longitude: 78.9629
+        imageUrl: '',
+        imageAspectRatio: '2/3',
+        latitude: 20.5937,
+        longitude: 78.9629,
+        zoom: 5,
+        eventSubType: '',
+        seatingLayoutVariant: ''
     });
-    const [stats, setStats] = useState({ totalEvents: 0, totalBookings: 0, totalSeatsSold: 0 });
+    const [stats, setStats] = useState({ totalEvents: 0, totalBookings: 0, totalRevenue: 0 }); // Changed totalSeatsSold to totalRevenue
+    const { alert, showAlert } = useExtendedAlert();
     const { showMessage } = useMessage();
+    const isEditingRef = React.useRef(null); // Ref to track edit mode for zone merging
+
+    // Zone Dialog State (NEW APPROACH)
+    const [zoneDialog, setZoneDialog] = useState({ isOpen: false, zoneId: null, zoneName: '' });
+    const [zoneConfigs, setZoneConfigs] = useState({}); // { 'stand_a_lower': { categoryName, seats, price, color } }
+
+    // Row Selection State (NEW)
+    const [rowSelectionMode, setRowSelectionMode] = useState(false);
+
+    // Bulk Delete State
+    const [selectedEvents, setSelectedEvents] = useState([]);
+    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+
+    // Get sport-specific categories based on selected event subtype
+    const availableCategories = React.useMemo(() => {
+        // For Stadium events, use sport-specific categories
+        if (newEvent.eventType === EVENT_TYPES.STADIUM && newEvent.eventSubType) {
+            const sportCategories = getCategoriesForSport(newEvent.eventSubType);
+            if (sportCategories && sportCategories.length > 0) {
+                return sportCategories;
+            }
+        }
+        // For other event types, use legacy categories
+        return LEGACY_SEAT_CATEGORIES;
+    }, [newEvent.eventType, newEvent.eventSubType]);
+    const [rowAssignments, setRowAssignments] = useState([]);
+    const [selectedRowsForDialog, setSelectedRowsForDialog] = useState(null);
+    const [editingRowIndex, setEditingRowIndex] = useState(null);
 
     // Helper state for Date Picker
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedTime, setSelectedTime] = useState("10:00");
     const [clockDate, setClockDate] = useState(new Date());
 
-    // Category Configuration State
-    const [categoryConfig, setCategoryConfig] = useState(
-        SEAT_CATEGORIES.map(cat => ({
-            ...cat,
-            enabled: false,
-            seats: "",
-            price: "",
-            position: "Front",
-        }))
-    );
+    // Auto-generate zone map for display
+    const adminZoneMap = React.useMemo(() => {
+        const map = {};
+        Object.entries(zoneConfigs).forEach(([zoneId, config]) => {
+            map[zoneId] = {
+                categoryName: config.categoryName,
+                price: config.price,
+                color: config.color
+            };
+        });
+        return map;
+    }, [zoneConfigs]);
+
+    // Get active zones (configured zones + currently editing zone)
+    const activeZones = React.useMemo(() => [
+        ...Object.keys(zoneConfigs),
+        ...(zoneDialog.isOpen ? [zoneDialog.zoneId] : [])
+    ], [zoneConfigs, zoneDialog.isOpen, zoneDialog.zoneId]);
 
     // Sync clock with selected time
     useEffect(() => {
@@ -79,7 +323,11 @@ const AdminDashboard = () => {
     const fetchEvents = async () => {
         try {
             const res = await api.get('/events');
-            setEvents(res.data);
+            // Sort events by date - newest first
+            const sortedEvents = (res.data || []).sort((a, b) =>
+                new Date(b.eventDate || 0) - new Date(a.eventDate || 0)
+            );
+            setEvents(sortedEvents);
         } catch (error) {
             console.error("Failed to fetch events");
         }
@@ -116,6 +364,59 @@ const AdminDashboard = () => {
         }
     }, [newEvent.id]);
 
+    // Effect to reset layout when subtype changes
+    useEffect(() => {
+        if (newEvent.eventSubType && newEvent.eventType) {
+            const availableLayouts = getLayoutsForSubtype(newEvent.eventType, newEvent.eventSubType);
+            // If current layout is not valid for new subtype, reset to first available layout
+            if (!availableLayouts.includes(newEvent.seatingLayoutVariant)) {
+                setNewEvent(prev => ({ ...prev, seatingLayoutVariant: availableLayouts[0] || '' }));
+            }
+        }
+    }, [newEvent.eventSubType, newEvent.eventType]);
+
+    // Effect to auto-populate zones when Stadium sport is selected
+    useEffect(() => {
+        // Only auto-populate for Stadium events
+        if (newEvent.eventType === EVENT_TYPES.STADIUM && newEvent.eventSubType) {
+            const sportCategories = getCategoriesForSport(newEvent.eventSubType);
+
+            if (sportCategories && sportCategories.length > 0) {
+                // Auto-populate all zones with pre-defined categories
+                const autoConfigs = autoPopulateZoneConfigs(newEvent.eventSubType, sportCategories);
+
+                // If editing an event, merge defaults with existing to ensure new zones (e.g. Corners) appear
+                if (newEvent.id && isEditingRef.current === newEvent.id) {
+                    setZoneConfigs(prev => ({ ...autoConfigs, ...prev }));
+                    isEditingRef.current = null; // Clear ref after merge
+                } else {
+                    setZoneConfigs(autoConfigs);
+                }
+
+                console.log(`✅ Auto-populated ${Object.keys(autoConfigs).length} zones for ${newEvent.eventSubType}`);
+            }
+        } else {
+            // Clear zone configs for non-stadium events or when no subtype selected
+            if (Object.keys(zoneConfigs).length > 0) {
+                setZoneConfigs({});
+            }
+        }
+    }, [newEvent.eventType, newEvent.eventSubType]);
+
+    const handleEventTypeChange = (type) => {
+        const subTypes = EVENT_SUBTYPES[type] || [];
+        const defaultSubType = subTypes[0] || '';
+        const availableLayouts = getLayoutsForSubtype(type, defaultSubType);
+        const defaultLayout = availableLayouts[0] || 'Default';
+
+        setNewEvent(prev => ({
+            ...prev,
+            eventType: type,
+            eventSubType: defaultSubType,
+            seatingLayoutVariant: defaultLayout
+        }));
+    };
+
     const handleChange = (e) => {
         setNewEvent({ ...newEvent, [e.target.name]: e.target.value });
     };
@@ -143,12 +444,12 @@ const AdminDashboard = () => {
         try {
             // 1. Basic Validation
             if (!newEvent.name || !newEvent.eventType) {
-                showMessage("Please fill in Event Name and Type.", { type: 'info' });
+                showAlert('Missing Information', 'Please fill in Event Name and Type.', 'warning');
                 return;
             }
 
             if (!selectedDate || !selectedTime) {
-                showMessage("Please select both Date and Start Time.", { type: 'info' });
+                showAlert('Missing Date/Time', 'Please select both Date and Start Time.', 'warning');
                 return;
             }
 
@@ -162,17 +463,38 @@ const AdminDashboard = () => {
             const pad = (n) => n.toString().padStart(2, '0');
             const localIso = `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}T${pad(hours)}:${pad(minutes)}:00`;
 
-            // 3. Categories
-            const enabledCategories = categoryConfig
-                .filter(c => c.enabled)
-                .map(c => ({
-                    categoryName: c.name,
-                    price: parseFloat(c.price) || 0,
-                    totalSeats: parseInt(c.seats) || 0,
-                    availableSeats: parseInt(c.seats) || 0,
-                    arenaPosition: c.position || "Front",
-                    color: c.color
+            // 3. Categories from Zone Configurations
+            // 3. Categories from Zone Configurations
+            let enabledCategories = [];
+
+            // A. Theatre Row Assignments (Priority if present)
+            if (rowAssignments && rowAssignments.length > 0) {
+                enabledCategories = rowAssignments.map((assignment) => ({
+                    categoryName: assignment.categoryName,
+                    price: parseFloat(assignment.price) || 0,
+                    totalSeats: assignment.rows.length * (parseInt(assignment.seatsPerRow) || 20),
+                    availableSeats: assignment.rows.length * (parseInt(assignment.seatsPerRow) || 20),
+                    // Serialize config into arenaPosition: "rows:A,C,E;cols:20"
+                    arenaPosition: `rows:${(assignment.rows || []).join(',')};cols:${assignment.seatsPerRow || 20}`,
+                    color: assignment.color
                 }));
+            }
+            // B. Visual Zone Configs (Stadium/Concert/Default)
+            else {
+                enabledCategories = Object.entries(zoneConfigs).map(([zoneId, config]) => ({
+                    categoryName: config.categoryName,
+                    price: parseFloat(config.price) || 0,
+                    totalSeats: parseInt(config.seats) || 0,
+                    availableSeats: parseInt(config.seats) || 0,
+                    arenaPosition: zoneId,
+                    color: config.color
+                }));
+            }
+
+            if (enabledCategories.length === 0 && [EVENT_TYPES.STADIUM, EVENT_TYPES.CONCERT].includes(newEvent.eventType)) {
+                showAlert('No Zones Configured', 'Please configure at least one zone for Stadium/Concert events.', 'warning');
+                return;
+            }
 
             // 4. Final Payload
             const payload = {
@@ -183,8 +505,11 @@ const AdminDashboard = () => {
                 categories: enabledCategories,
                 locationName: newEvent.locationName,
                 locationAddress: newEvent.locationAddress,
+                imageUrl: newEvent.imageUrl,
                 latitude: newEvent.latitude,
-                longitude: newEvent.longitude
+                longitude: newEvent.longitude,
+                eventSubType: newEvent.eventSubType,
+                seatingLayoutVariant: newEvent.seatingLayoutVariant
             };
 
             console.log("Submitting Event Payload:", payload);
@@ -203,48 +528,57 @@ const AdminDashboard = () => {
             fetchStats();
 
             // 5. Reset form
-            setNewEvent({ name: '', description: '', eventDate: '', eventType: '' });
+            setNewEvent({ name: '', description: '', eventDate: '', eventType: '', eventSubType: '', seatingLayoutVariant: '' });
             setSelectedDate(null);
             setSelectedTime("10:00");
-            setCategoryConfig(
-                SEAT_CATEGORIES.map(cat => ({
-                    ...cat,
-                    enabled: false,
-                    seats: "",
-                    price: "",
-                    position: "Front",
-                }))
-            );
+            setZoneConfigs({}); // Reset zone configurations
         } catch (error) {
             console.error("Event Creation/Update Error Full:", error);
             let errorMessage = error.response?.data?.message || error.message || 'Failed to process event.';
-            showMessage(errorMessage, { type: 'error' });
+            showAlert('Operation Failed', errorMessage, 'error');
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedEvents.length === 0) return;
+
+        try {
+            await Promise.all(selectedEvents.map(id => api.delete(`/events/${id}`)));
+            showMessage(`Successfully deleted ${selectedEvents.length} event(s)!`, { type: 'success' });
+            setSelectedEvents([]);
+            setShowBulkDeleteDialog(false);
+            fetchEvents();
+            fetchStats();
+        } catch (error) {
+            showAlert('Bulk Delete Failed', 'Failed to delete some events', 'error');
+            setShowBulkDeleteDialog(false);
         }
     };
 
     const handleDelete = async (id) => {
         try {
             await api.delete(`/events/${id}`);
-            showMessage('Event deleted successfully!', { type: 'success' });
+            showMessage('Event deleted successfully!', { type: 'success' }); // Toast for success
             fetchEvents();
             fetchStats();
         } catch (error) {
-            showMessage('Failed to delete event', { type: 'error' });
+            showAlert('Delete Failed', 'Failed to delete event', 'error');
         }
     };
 
     const handleCancelEvent = async (id, reason) => {
         try {
             await api.post(`/events/${id}/cancel`, { reason });
-            showMessage('Event cancelled successfully!', { type: 'success' });
+            showMessage('Event cancelled successfully!', { type: 'success' }); // Toast for success
             fetchEvents();
             fetchStats();
         } catch (error) {
-            showMessage('Failed to cancel event', { type: 'error' });
+            showAlert('Cancellation Failed', 'Failed to cancel event', 'error');
         }
     };
 
     const handleEdit = (event) => {
+        isEditingRef.current = event.id; // Set ref to trigger merge logic in useEffect
         setNewEvent({
             id: event.id,
             name: event.name,
@@ -253,27 +587,73 @@ const AdminDashboard = () => {
             eventType: event.eventType,
             locationName: event.locationName || '',
             locationAddress: event.locationAddress || '',
+            imageUrl: event.imageUrl || '',
+            imageAspectRatio: event.imageAspectRatio || '2/3',
             latitude: Number(event.latitude) || 20.5937,
-            longitude: Number(event.longitude) || 78.9629
+            longitude: Number(event.longitude) || 78.9629,
+            eventSubType: event.eventSubType || '',
+            seatingLayoutVariant: event.seatingLayoutVariant || ''
         });
 
-        // Sync categories
-        const updatedConfig = SEAT_CATEGORIES.map(baseCat => {
-            const existing = event.categories?.find(c => c.categoryName === baseCat.name);
-            if (existing) {
-                return {
-                    ...baseCat,
-                    enabled: true,
-                    seats: existing.totalSeats.toString(),
-                    price: existing.price.toString(),
-                    position: existing.arenaPosition
-                };
-            }
-            return { ...baseCat, enabled: false, seats: "", price: "", position: "Front" };
-        });
-        setCategoryConfig(updatedConfig);
+        // Sync categories to Zone Configs
+        // Sync categories to Zone Configs or Row Assignments
+        const existingZones = {};
+        const existingAssignments = [];
+
+        if (event.categories && Array.isArray(event.categories)) {
+            event.categories.forEach(cat => {
+                // Check if it's a serialized Row Assignment
+                if (cat.arenaPosition && typeof cat.arenaPosition === 'string' && cat.arenaPosition.startsWith('rows:')) {
+                    try {
+                        const parts = cat.arenaPosition.split(';');
+                        const rowsPart = parts.find(p => p.startsWith('rows:'));
+                        const colsPart = parts.find(p => p.startsWith('cols:'));
+                        const rowsVal = rowsPart ? rowsPart.split(':')[1].split(',') : [];
+                        const colsVal = colsPart ? parseInt(colsPart.split(':')[1]) : 20;
+
+                        existingAssignments.push({
+                            categoryName: cat.categoryName,
+                            price: cat.price,
+                            color: cat.color || '#3B82F6',
+                            rows: rowsVal,
+                            seatsPerRow: colsVal
+                        });
+                    } catch (e) { console.warn("Parse error", e); }
+                }
+                // Else regular Zone Config
+                else if (cat.arenaPosition) {
+                    existingZones[cat.arenaPosition] = {
+                        categoryName: cat.categoryName,
+                        seats: cat.totalSeats,
+                        price: cat.price,
+                        color: cat.color || '#3B82F6' // Default fallback
+                    };
+                }
+            });
+        }
+        setZoneConfigs(existingZones);
+        setRowAssignments(existingAssignments);
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleLocationSelect = async (pos) => {
+        // 1. Update coordinates immediately for UI responsiveness
+        setNewEvent(prev => ({ ...prev, ...pos }));
+
+        // 2. Fetch address
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.latitude}&lon=${pos.longitude}`);
+            const data = await res.json();
+            if (data && data.display_name) {
+                setNewEvent(prev => ({
+                    ...prev,
+                    locationAddress: data.display_name
+                }));
+            }
+        } catch (err) {
+            console.error("Failed to fetch address", err);
+        }
     };
 
     return (
@@ -343,23 +723,71 @@ const AdminDashboard = () => {
                                             </button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
-                                            <DropdownMenuItem onClick={() => setNewEvent({ ...newEvent, eventType: 'Concert' })}>
+                                            <DropdownMenuItem onClick={() => handleEventTypeChange(EVENT_TYPES.CONCERT)}>
                                                 Concert
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => setNewEvent({ ...newEvent, eventType: 'Theatre' })}>
+                                            <DropdownMenuItem onClick={() => handleEventTypeChange(EVENT_TYPES.THEATRE)}>
                                                 Theatre
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => setNewEvent({ ...newEvent, eventType: 'Stadium' })}>
+                                            <DropdownMenuItem onClick={() => handleEventTypeChange(EVENT_TYPES.STADIUM)}>
                                                 Stadium
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => setNewEvent({ ...newEvent, eventType: 'Private Party' })}>
-                                                Private Party
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => setNewEvent({ ...newEvent, eventType: 'Auditorium' })}>
-                                                Auditorium
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
+                                </div>
+
+                                {/* Event Sub-Type & Layout Variant */}
+                                {newEvent.eventType && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700">Sub-Type</label>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <button type="button" className="w-full h-11 px-4 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white transition-all text-left flex justify-between items-center text-sm">
+                                                        <span>{newEvent.eventSubType || "Select"}</span>
+                                                        <ChevronDown className="h-4 w-4 opacity-50" />
+                                                    </button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    {(EVENT_SUBTYPES[newEvent.eventType] || []).map(sub => (
+                                                        <DropdownMenuItem key={sub} onClick={() => setNewEvent({ ...newEvent, eventSubType: sub })}>
+                                                            {sub}
+                                                        </DropdownMenuItem>
+                                                    ))}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                        {newEvent.eventType !== 'Stadium' && (
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium text-slate-700">Layout</label>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <button type="button" className="w-full h-11 px-4 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white transition-all text-left flex justify-between items-center text-sm">
+                                                            <span>{newEvent.seatingLayoutVariant || "Default"}</span>
+                                                            <ChevronDown className="h-4 w-4 opacity-50" />
+                                                        </button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent>
+                                                        {getLayoutsForSubtype(newEvent.eventType, newEvent.eventSubType).map(v => (
+                                                            <DropdownMenuItem key={v} onClick={() => setNewEvent({ ...newEvent, seatingLayoutVariant: v })}>
+                                                                {v}
+                                                            </DropdownMenuItem>
+                                                        ))}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700">Event Poster</label>
+                                    <EventImageUpload
+                                        value={newEvent.imageUrl}
+                                        onChange={(url) => setNewEvent({ ...newEvent, imageUrl: url })}
+                                        aspectRatio={newEvent.imageAspectRatio}
+                                        onAspectRatioChange={(ratio) => setNewEvent({ ...newEvent, imageAspectRatio: ratio })}
+                                    />
                                 </div>
 
                                 <div className="space-y-2">
@@ -437,13 +865,13 @@ const AdminDashboard = () => {
                                                 zoom: newEvent.zoom || 5
                                             }}
                                             className="w-full h-full"
-                                            onClick={(pos) => setNewEvent(prev => ({ ...prev, ...pos }))}
+                                            onClick={handleLocationSelect}
                                         >
                                             <Marker
                                                 longitude={Number(newEvent.longitude) || 78.9629}
                                                 latitude={Number(newEvent.latitude) || 20.5937}
                                                 draggable={true}
-                                                onDragEnd={(pos) => setNewEvent(prev => ({ ...prev, ...pos }))}
+                                                onDragEnd={handleLocationSelect}
                                             />
                                         </Map>
                                     </div>
@@ -455,6 +883,7 @@ const AdminDashboard = () => {
                                         <ModernDatePicker
                                             date={selectedDate}
                                             setDate={setSelectedDate}
+                                            disabled={(date) => date < new Date().setHours(0, 0, 0, 0)}
                                         />
                                     </div>
 
@@ -463,6 +892,21 @@ const AdminDashboard = () => {
                                         <ModernTimePicker
                                             value={selectedTime}
                                             onChange={setSelectedTime}
+                                            disabled={!selectedDate}
+                                            minTime={(() => {
+                                                if (!selectedDate) return null;
+                                                const now = new Date();
+                                                const sel = new Date(selectedDate);
+                                                if (sel.setHours(0, 0, 0, 0) !== now.setHours(0, 0, 0, 0)) return null;
+
+                                                const future = new Date();
+                                                future.setHours(future.getHours() + 3);
+
+                                                // If +3 hours is tomorrow, disable all of today
+                                                if (future.getDate() !== new Date().getDate()) return "24:00";
+
+                                                return `${future.getHours().toString().padStart(2, '0')}:${future.getMinutes().toString().padStart(2, '0')}`;
+                                            })()}
                                         />
                                     </div>
                                 </div>
@@ -476,97 +920,200 @@ const AdminDashboard = () => {
                             </div>
 
                             <div className="p-6">
-                                <p className="text-sm text-slate-500 mb-4">Enable categories and configure seats/prices.</p>
+                                <p className="text-sm text-slate-500 mb-4">Click on any zone in the stadium to configure it.</p>
 
-                                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                                    {categoryConfig?.map((cat, index) => (
-                                        <div
-                                            key={cat.name}
-                                            className={cn(
-                                                "border rounded-xl p-3 transition-all",
-                                                cat.enabled ? "bg-slate-50 border-slate-300" : "border-slate-200"
-                                            )}
-                                        >
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div className="flex items-center gap-2">
-                                                    <span
-                                                        className="block rounded-full"
-                                                        style={{ background: cat.color, width: '12px', height: '12px' }}
-                                                    />
-                                                    <strong className="text-sm text-slate-700">{cat.name}</strong>
-                                                </div>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={cat.enabled}
-                                                    onChange={(e) => {
-                                                        const updated = [...categoryConfig];
-                                                        updated[index].enabled = e.target.checked;
-                                                        setCategoryConfig(updated);
-                                                    }}
-                                                    className="w-5 h-5 accent-primary rounded cursor-pointer"
-                                                />
-                                            </div>
-
-                                            {cat.enabled && (
-                                                <div className="grid grid-cols-3 gap-2 mt-3">
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Seats"
-                                                        value={cat.seats}
-                                                        onChange={(e) => {
-                                                            const updated = [...categoryConfig];
-                                                            updated[index].seats = e.target.value;
-                                                            setCategoryConfig(updated);
-                                                        }}
-                                                        className="h-9 w-full px-2 rounded border border-slate-300 text-sm"
-                                                    />
-
-                                                    <div className="relative">
-                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">₹</span>
-                                                        <input
-                                                            type="number"
-                                                            placeholder="Price"
-                                                            value={cat.price}
-                                                            onChange={(e) => {
-                                                                const updated = [...categoryConfig];
-                                                                updated[index].price = e.target.value;
-                                                                setCategoryConfig(updated);
-                                                            }}
-                                                            className="h-9 w-full pl-6 pr-2 rounded border border-slate-300 text-sm"
-                                                        />
-                                                    </div>
-
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <button
-                                                                type="button"
-                                                                className="h-9 w-full px-2 rounded border border-slate-300 text-sm flex items-center justify-between hover:bg-slate-50 transition-colors"
-                                                            >
-                                                                <span>{cat.position}</span>
-                                                                <ChevronDown className="h-3 w-3 opacity-50" />
-                                                            </button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
-                                                            {['Front', 'Center', 'Back', 'Upper', 'Lower', 'Balcony'].map((pos) => (
-                                                                <DropdownMenuItem
-                                                                    key={pos}
-                                                                    onClick={() => {
-                                                                        const updated = [...categoryConfig];
-                                                                        updated[index].position = pos;
-                                                                        setCategoryConfig(updated);
-                                                                    }}
-                                                                >
-                                                                    {pos}
-                                                                </DropdownMenuItem>
-                                                            ))}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            )}
+                                {/* Visual Zone Assigner */}
+                                {['Stadium', 'Concert', 'Theatre'].includes(newEvent.eventType) && (
+                                    <div className="mb-6 p-4 border border-slate-200 rounded-xl bg-slate-50 text-center">
+                                        <h3 className="font-bold text-slate-700 text-sm mb-2">{newEvent.eventType} Layout</h3>
+                                        <p className="text-xs text-slate-500 mb-3">Click any zone to configure category, seats, and pricing</p>
+                                        <div className="relative overflow-hidden rounded-lg bg-white border border-slate-200 shadow-inner h-[500px] flex items-center justify-center">
+                                            <VenueVisuals
+                                                key={`${newEvent.eventType}-${newEvent.seatingLayoutVariant}`}
+                                                type={newEvent.eventType}
+                                                subType={newEvent.eventSubType}
+                                                variant={newEvent.seatingLayoutVariant}
+                                                zoneMap={adminZoneMap}
+                                                activeZones={activeZones}
+                                                rowAssignments={rowAssignments}
+                                                adminMode={true}
+                                                zoneConfigs={zoneConfigs}
+                                                onZoneSelect={(zoneId) => {
+                                                    // Format zone name for display
+                                                    const zoneName = zoneId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                                    setZoneDialog({
+                                                        isOpen: true,
+                                                        zoneId,
+                                                        zoneName,
+                                                        initialData: zoneConfigs[zoneId] || {}
+                                                    });
+                                                }}
+                                            />
                                         </div>
-                                    ))}
-                                </div>
+                                    </div>
+                                )}
+
+                                {/* NEW: Configure Rows Button (for Theatre only) */}
+                                {newEvent.eventType === 'Theatre' && (
+                                    <div className="mt-4">
+                                        <Button
+                                            type="button"
+                                            onClick={() => setRowSelectionMode(true)}
+                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                        >
+                                            📝 Configure Rows
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {/* Configured Zones List */}
+                                {Object.keys(zoneConfigs).length > 0 && (
+                                    <div className="mt-4">
+                                        <h4 className="text-sm font-bold text-slate-700 mb-3">Configured Zones ({Object.keys(zoneConfigs).length})</h4>
+                                        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                                            {Object.entries(zoneConfigs).map(([zoneId, config]) => (
+                                                <div key={zoneId} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg">
+                                                    <div className="flex items-center gap-3">
+                                                        <div
+                                                            className="w-4 h-4 rounded-full"
+                                                            style={{ backgroundColor: config.color }}
+                                                        />
+                                                        <div>
+                                                            <div className="text-sm font-medium text-slate-900">{config.categoryName}</div>
+                                                            <div className="text-xs text-slate-500">
+                                                                {zoneId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} • {config.seats} seats • ₹{config.price}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-4">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setZoneDialog({
+                                                                isOpen: true,
+                                                                zoneId,
+                                                                zoneName: zoneId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                                                                initialData: config
+                                                            })}
+                                                            className="text-blue-600 hover:text-blue-700 text-xs font-medium"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const newConfigs = { ...zoneConfigs };
+                                                                delete newConfigs[zoneId];
+                                                                setZoneConfigs(newConfigs);
+                                                            }}
+                                                            className="text-red-600 hover:text-red-700 text-xs font-medium"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Configured Row Assignments */}
+                                {rowAssignments.length > 0 && (
+                                    <div className="mt-6">
+                                        <h4 className="text-sm font-bold text-slate-700 mb-3">Configured Row Assignments ({rowAssignments.length})</h4>
+                                        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                                            {rowAssignments.map((assignment, index) => (
+                                                <div key={index} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg">
+                                                    <div className="flex items-center gap-3">
+                                                        <div
+                                                            className="w-4 h-4 rounded-full"
+                                                            style={{ backgroundColor: assignment.color }}
+                                                        />
+                                                        <div>
+                                                            <div className="text-sm font-medium text-slate-900">{assignment.categoryName}</div>
+                                                            <div className="text-xs text-slate-500">
+                                                                Rows {assignment.rows.join(', ')} • {assignment.seatsPerRow} seats/row • ₹{assignment.price}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-4">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedRowsForDialog(assignment.rows);
+                                                                setEditingRowIndex(index);
+                                                            }}
+                                                            className="text-blue-600 hover:text-blue-700 text-xs font-medium"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setRowAssignments(rowAssignments.filter((_, i) => i !== index));
+                                                            }}
+                                                            className="text-red-600 hover:text-red-700 text-xs font-medium"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
+
+                            {/* Zone Configuration Dialog */}
+                            <ZoneConfigDialog
+                                isOpen={zoneDialog.isOpen}
+                                zoneName={zoneDialog.zoneName}
+                                initialData={zoneDialog.initialData}
+                                availableCategories={availableCategories}
+                                onClose={() => setZoneDialog({ isOpen: false, zoneId: null, zoneName: '' })}
+                                onSave={(config) => {
+                                    setZoneConfigs({
+                                        ...zoneConfigs,
+                                        [zoneDialog.zoneId]: config
+                                    });
+                                }}
+                            />
+
+                            {/* NEW: Row Selection Overlay */}
+                            {rowSelectionMode && (
+                                <RowSelectionOverlay
+                                    totalRows={26}
+                                    assignedRows={rowAssignments.flatMap(a => a.rows)}
+                                    onRowsSelected={(rows) => {
+                                        setSelectedRowsForDialog(rows);
+                                        setRowSelectionMode(false);
+                                    }}
+                                    onCancel={() => setRowSelectionMode(false)}
+                                />
+                            )}
+
+                            {/* NEW: Row Selection Dialog */}
+                            <RowSelectionDialog
+                                isOpen={selectedRowsForDialog !== null}
+                                onClose={() => {
+                                    setSelectedRowsForDialog(null);
+                                    setEditingRowIndex(null);
+                                }}
+                                selectedRows={selectedRowsForDialog}
+                                initialData={editingRowIndex !== null ? rowAssignments[editingRowIndex] : null}
+                                subtype={newEvent.eventSubType}
+                                onSave={(assignment) => {
+                                    if (editingRowIndex !== null) {
+                                        const newAssignments = [...rowAssignments];
+                                        newAssignments[editingRowIndex] = assignment;
+                                        setRowAssignments(newAssignments);
+                                    } else {
+                                        setRowAssignments([...rowAssignments, assignment]);
+                                    }
+                                    setSelectedRowsForDialog(null);
+                                    setEditingRowIndex(null);
+                                    console.log('Row assignment saved:', assignment);
+                                }}
+                            />
                         </div>
                     </div>
 
@@ -583,9 +1130,10 @@ const AdminDashboard = () => {
                             <button
                                 type="button"
                                 onClick={() => {
-                                    setNewEvent({ name: '', description: '', eventDate: '', eventType: '' });
+                                    setNewEvent({ name: '', description: '', eventDate: '', eventType: '', eventSubType: '', seatingLayoutVariant: '' });
                                     setSelectedDate(null);
                                     setSelectedTime("10:00");
+                                    setZoneConfigs({});
                                 }}
                                 className="px-8 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 rounded-xl transition-all"
                             >
@@ -597,8 +1145,23 @@ const AdminDashboard = () => {
 
                 {/* Manage Events Table */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div className="p-6 border-b border-slate-100 bg-slate-50/30">
+                    <div className="p-6 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
                         <h2 className="text-xl font-bold text-slate-900">Manage Events</h2>
+                        {selectedEvents.length > 0 && (
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm text-slate-600">
+                                    {selectedEvents.length} selected
+                                </span>
+                                <Button
+                                    onClick={() => setShowBulkDeleteDialog(true)}
+                                    variant="destructive"
+                                    size="sm"
+                                    className="bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                    Delete Selected ({selectedEvents.length})
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     <div className="p-0">
@@ -609,6 +1172,20 @@ const AdminDashboard = () => {
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-slate-50 border-b border-slate-100 uppercase tracking-wider text-xs font-semibold text-slate-500">
                                         <tr>
+                                            <th className="px-4 py-4 w-12">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedEvents.length === events.length && events.length > 0}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setSelectedEvents(events.map(ev => ev.id));
+                                                        } else {
+                                                            setSelectedEvents([]);
+                                                        }
+                                                    }}
+                                                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                                                />
+                                            </th>
                                             <th className="px-6 py-4">Name</th>
                                             <th className="px-6 py-4">Date</th>
                                             <th className="px-6 py-4">Type</th>
@@ -618,6 +1195,20 @@ const AdminDashboard = () => {
                                     <tbody className="divide-y divide-slate-100">
                                         {events.map(event => (
                                             <tr key={event.id} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-4 py-4">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedEvents.includes(event.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedEvents([...selectedEvents, event.id]);
+                                                            } else {
+                                                                setSelectedEvents(selectedEvents.filter(id => id !== event.id));
+                                                            }
+                                                        }}
+                                                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                                                    />
+                                                </td>
                                                 <td className="px-6 py-4 font-medium text-slate-900">{event.name}</td>
                                                 <td className="px-6 py-4 text-slate-600">{new Date(event.eventDate).toLocaleString()}</td>
                                                 <td className="px-6 py-4">
@@ -651,6 +1242,34 @@ const AdminDashboard = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Bulk Delete Confirmation Dialog */}
+            <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-xl font-bold text-slate-900">
+                            Delete Multiple Events?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-slate-600">
+                            You are about to permanently delete <span className="font-bold text-red-600">{selectedEvents.length} event(s)</span>.
+                            This action cannot be undone. All associated bookings and data will be lost.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-slate-100 hover:bg-slate-200 text-slate-700">
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleBulkDelete}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            Delete {selectedEvents.length} Event{selectedEvents.length > 1 ? 's' : ''}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <ExtendedAlert state={alert} />
         </div>
     );
 };

@@ -23,6 +23,12 @@ public class Event {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "image_url")
+    private String imageUrl;
+
+    @Column(name = "image_aspect_ratio")
+    private String imageAspectRatio;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 
@@ -31,6 +37,12 @@ public class Event {
 
     @Column(name = "event_type")
     private String eventType;
+
+    @Column(name = "event_sub_type")
+    private String eventSubType;
+
+    @Column(name = "seating_layout_variant")
+    private String seatingLayoutVariant;
 
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<EventCategory> categories = new ArrayList<>();

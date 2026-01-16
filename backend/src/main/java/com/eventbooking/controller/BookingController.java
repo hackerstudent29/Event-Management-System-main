@@ -19,9 +19,6 @@ public class BookingController {
     @Autowired
     private com.eventbooking.repository.UserRepository userRepository;
 
-    @Autowired
-    private com.eventbooking.security.JwtUtil jwtUtil;
-
     @PostMapping
     public ResponseEntity<Booking> bookSeats(@RequestBody Dtos.BookingRequest request) {
         return ResponseEntity.ok(bookingService.bookSeats(request));
