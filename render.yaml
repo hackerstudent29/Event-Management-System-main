@@ -1,0 +1,30 @@
+version: 1
+services:
+  - type: web
+    name: event-booking-backend
+    env: java
+    region: singapore
+    plan: free
+    buildCommand: cd backend && mvn clean package -DskipTests
+    startCommand: cd backend && java -jar target/EventBookingBackend-0.0.1-SNAPSHOT.jar
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:postgresql://aws-1-ap-south-1.pooler.supabase.com:5432/postgres
+      - key: SPRING_DATASOURCE_USERNAME
+        value: postgres.dlpxciimpvqugavnitne
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: SERVER_PORT
+        value: 8080
+      - key: SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: update
+      - key: APP_CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        value: rzp_test_placeholder
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: SPRING_MAIL_USERNAME
+        value: eventbooking.otp@gmail.com
+      - key: SPRING_MAIL_PASSWORD
+        sync: false
