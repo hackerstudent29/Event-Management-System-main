@@ -6,7 +6,7 @@ services:
     region: singapore
     plan: free
     buildCommand: cd backend && mvn clean package -DskipTests
-    startCommand: cd backend && java -jar target/EventBookingBackend-0.0.1-SNAPSHOT.jar
+    startCommand: cd backend && java -Dserver.port=$PORT -jar target/EventBookingBackend-0.0.1-SNAPSHOT.jar
     envVars:
       - key: SPRING_DATASOURCE_URL
         value: jdbc:postgresql://aws-1-ap-south-1.pooler.supabase.com:5432/postgres
@@ -14,8 +14,6 @@ services:
         value: postgres.dlpxciimpvqugavnitne
       - key: SPRING_DATASOURCE_PASSWORD
         sync: false
-      - key: SERVER_PORT
-        value: 8080
       - key: SPRING_JPA_HIBERNATE_DDL_AUTO
         value: update
       - key: APP_CORS_ALLOWED_ORIGINS
