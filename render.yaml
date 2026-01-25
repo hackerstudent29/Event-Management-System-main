@@ -17,7 +17,7 @@ services:
       - key: SPRING_JPA_HIBERNATE_DDL_AUTO
         value: update
       - key: APP_CORS_ALLOWED_ORIGINS
-        sync: false
+        value: https://zendrum.vercel.app,https://zendrum-frontend.vercel.app,http://localhost:5173,http://localhost:3000
       - key: RAZORPAY_KEY_ID
         value: rzp_test_placeholder
       - key: RAZORPAY_KEY_SECRET
