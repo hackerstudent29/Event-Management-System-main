@@ -2,13 +2,15 @@ import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { MobileBottomNav } from './mobile-nav';
 import Navbar from '../Navbar';
+import LocationModal from '../LocationModal';
 
 // Pages that should NOT show bottom nav (auth pages, etc.)
 const NO_NAV_PAGES = [
     '/login',
     '/register',
     '/forgot-password',
-    '/verify-signup-otp'
+    '/verify-signup-otp',
+    '/zendrum-booking'
 ];
 
 export const AppLayout = () => {
@@ -25,6 +27,8 @@ export const AppLayout = () => {
                     <Navbar />
                 </div>
             )}
+
+            <LocationModal />
 
             {/* Main content */}
             <main className={hideNav ? '' : 'pb-20 md:pb-0 md:pt-28'}>

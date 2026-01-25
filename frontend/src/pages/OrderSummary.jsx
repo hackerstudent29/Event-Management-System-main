@@ -1,13 +1,15 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { CreditCard, MapPin, Ticket, ChevronLeft, Calendar as CalendarIcon } from "lucide-react";
+import { CreditCard, MapPin, Ticket, ChevronLeft, Calendar as CalendarIcon, Clock } from "lucide-react";
 import api from '../api/axios';
 import { useMessage } from "../context/MessageContext";
 import { cn } from "@/lib/utils";
 import { getDefaultEventImage } from "../lib/image-utils";
+import { useAuth } from "../context/AuthContext";
 
 export default function OrderSummary() {
+    const { user } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const state = location.state || {};
@@ -15,8 +17,31 @@ export default function OrderSummary() {
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [bookingConfirmed, setBookingConfirmed] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState("upi");
+    const [paymentMethod, setPaymentMethod] = useState("wallet");
+    const [referenceId] = useState(crypto.randomUUID().slice(0, 8).toUpperCase()); // Short readable ref
+    const [walletStatus, setWalletStatus] = useState('idle'); // idle, verifying
     const { showMessage } = useMessage();
+    const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
+
+    React.useEffect(() => {
+        if (timeLeft <= 0) {
+            showMessage("Session expired. Your seat hold has been released.", { type: 'error' });
+            navigate('/');
+            return;
+        }
+
+        const timer = setInterval(() => {
+            setTimeLeft(prev => prev - 1);
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [timeLeft, navigate, showMessage]);
+
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
 
     // Fallback if accessed directly without state
     if (!event || !purchasedItems) {
@@ -52,7 +77,52 @@ export default function OrderSummary() {
     const gstAmount = Number((convenienceFee * 0.18).toFixed(2));
     const totalAmount = ticketPrice + convenienceFee + gstAmount;
 
+    const verifyWalletPayment = async () => {
+        setIsProcessing(true);
+        setWalletStatus('verifying');
+        try {
+            // MERCHANT ID from prompt: f294121c-2340-4e91-bf65-b550a6e0d81a
+            const merchantId = "f294121c-2340-4e91-bf65-b550a6e0d81a";
+
+            // Calling our own backend proxy instead of external URL directly
+            const res = await api.post('/api/payments/verify-wallet', {
+                merchantId,
+                referenceId
+            });
+
+            const data = res.data;
+
+            if (data.received) {
+                showMessage("Payment Received by Wallet App!", { type: 'success' });
+
+                // Confirm Booking on Backend with Wallet Details
+                await Promise.all(
+                    bookingPayload.map(payload => api.post('/api/bookings', {
+                        ...payload,
+                        paymentId: data.details.id,
+                        status: 'CONFIRMED'
+                    }))
+                );
+
+                setBookingConfirmed(true);
+            } else {
+                showMessage(data.message || "No matching transaction found.", { type: 'error' });
+            }
+        } catch (err) {
+            console.error("Wallet Verification Error:", err);
+            showMessage("Could not connect to Wallet App. Ensure it is running on port 5000.", { type: 'error' });
+        } finally {
+            setIsProcessing(false);
+            setWalletStatus('idle');
+        }
+    };
+
     const handlePayment = async () => {
+        if (paymentMethod === 'wallet') {
+            await verifyWalletPayment();
+            return;
+        }
+
         if (!bookingPayload || bookingPayload.length === 0) {
             showMessage("Invalid booking data.", { type: 'error' });
             return;
@@ -60,31 +130,100 @@ export default function OrderSummary() {
 
         setIsProcessing(true);
         try {
-            // Execute all booking requests in parallel
-            // Note: payload includes eventId which backend ignores via DTO binding
-            await Promise.all(
-                bookingPayload.map(payload => api.post('/bookings', payload))
-            );
+            // 1. Create Order on Backend
+            const orderRes = await api.post('/api/payments/create-order', {
+                amount: totalAmount,
+                currency: "INR"
+            });
+            const orderData = orderRes.data;
 
-            // Simulation of payment processing delay
-            setTimeout(() => {
-                if (typeof setBookingConfirmed === 'function') {
-                    setBookingConfirmed(true);
-                }
+            // 2. Load Razorpay Script
+            const loadScript = (src) => {
+                return new Promise((resolve) => {
+                    const script = document.createElement("script");
+                    script.src = src;
+                    script.onload = () => resolve(true);
+                    script.onerror = () => resolve(false);
+                    document.body.appendChild(script);
+                });
+            };
+
+            const res = await loadScript("https://checkout.razorpay.com/v1/checkout.js");
+            if (!res) {
+                showMessage("Razorpay SDK failed to load. Are you online?", { type: 'error' });
                 setIsProcessing(false);
-            }, 1000);
+                return;
+            }
+
+            // 3. Open Razorpay Checkout
+            const options = {
+                key: "rzp_test_placeholder", // This should match backend key or be passed from it
+                amount: orderData.amount,
+                currency: orderData.currency,
+                name: "Event Booking",
+                description: `Payment for ${event.name}`,
+                image: event.imageUrl || "https://example.com/logo.png",
+                order_id: orderData.id,
+                handler: async function (response) {
+                    // This function handles the success response from Razorpay
+                    try {
+                        const verifyRes = await api.post('/api/payments/verify', {
+                            razorpayOrderId: response.razorpay_order_id,
+                            razorpayPaymentId: response.razorpay_payment_id,
+                            razorpaySignature: response.razorpay_signature
+                        });
+
+                        if (verifyRes.data === true) {
+                            // 4. Confirm Booking on Backend with Payment Details
+                            await Promise.all(
+                                bookingPayload.map(payload => api.post('/api/bookings', {
+                                    ...payload,
+                                    paymentId: response.razorpay_payment_id,
+                                    razorpayOrderId: response.razorpay_order_id
+                                }))
+                            );
+
+                            setBookingConfirmed(true);
+                            setIsProcessing(false);
+                            showMessage("Booking & Payment Successful!", { type: 'success' });
+                        } else {
+                            showMessage("Payment verification failed.", { type: 'error' });
+                            setIsProcessing(false);
+                        }
+                    } catch (err) {
+                        console.error("Verification error", err);
+                        showMessage("Error verifying payment.", { type: 'error' });
+                        setIsProcessing(false);
+                    }
+                },
+                prefill: {
+                    name: user?.name || "Customer",
+                    email: user?.email || "",
+                    contact: ""
+                },
+                notes: {
+                    address: "Event Booking Office"
+                },
+                theme: {
+                    color: "#0f172a"
+                },
+                modal: {
+                    ondismiss: function () {
+                        setIsProcessing(false);
+                    }
+                }
+            };
+
+            const rzp1 = new window.Razorpay(options);
+            rzp1.open();
 
         } catch (error) {
             console.error("Booking Error:", error);
             setIsProcessing(false);
-
-            // Safe message extraction (handle raw string or object)
             const responseData = error.response?.data;
             const errorMsg = (typeof responseData === 'string' ? responseData : responseData?.message) ||
-                error.message ||
-                "Network error. Please try again.";
-
-            showMessage("Payment Failed: " + errorMsg, { type: 'error' });
+                error.message || "Network error. Please try again.";
+            showMessage("Payment Initialization Failed: " + errorMsg, { type: 'error' });
         }
     };
 
@@ -116,8 +255,11 @@ export default function OrderSummary() {
                     <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
                         <ChevronLeft className="h-4 w-4" /> Back
                     </button>
-                    <div className="text-sm font-semibold text-slate-400 uppercase tracking-widest">
-                        Secure Checkout
+                    <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-100 shadow-sm animate-pulse">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        <span className="text-xs font-black text-amber-700 tabular-nums">
+                            {formatTime(timeLeft)}
+                        </span>
                     </div>
                     <div className="w-16"></div>
                 </div>
@@ -151,6 +293,61 @@ export default function OrderSummary() {
                         </div>
 
                         <div className="divide-y divide-slate-100">
+                            {/* Wallet App Option (New) */}
+                            <label className={cn("relative flex flex-col p-6 cursor-pointer transition-colors", paymentMethod === 'wallet' ? "bg-indigo-50/10" : "hover:bg-slate-50")}>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        type="radio"
+                                        name="payment"
+                                        value="wallet"
+                                        checked={paymentMethod === 'wallet'}
+                                        onChange={() => setPaymentMethod('wallet')}
+                                        className="w-5 h-5 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                                    />
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-900">Wallet App</span>
+                                            <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-600 text-[8px] font-black uppercase rounded">External</span>
+                                        </div>
+                                        <p className="text-sm text-slate-500 mt-1">Pay via the central Wallet System</p>
+                                    </div>
+                                    <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" /><path d="M3 5v14a2 2 0 0 0 2 2h16v-5" /><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" /></svg>
+                                    </div>
+                                </div>
+
+                                {paymentMethod === 'wallet' && (
+                                    <div className="mt-4 ml-9 space-y-4 animate-in slide-in-from-top-2 fade-in duration-300">
+                                        <div className="p-5 bg-white border border-indigo-100 rounded-2xl shadow-sm space-y-4">
+                                            <div className="flex flex-col items-center text-center space-y-2">
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payment Instructions</div>
+                                                <p className="text-xs text-slate-600">
+                                                    Please complete the payment in your <span className="font-bold text-indigo-600">Wallet App</span> using the details below:
+                                                </p>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                                    <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Merchant ID</div>
+                                                    <div className="text-[10px] font-mono font-bold text-slate-700 truncate">f294121c...d81a</div>
+                                                </div>
+                                                <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                                                    <div className="text-[8px] font-bold text-indigo-400 uppercase mb-1">Reference ID</div>
+                                                    <div className="text-sm font-mono font-black text-indigo-700">{referenceId}</div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                                                <div className="text-amber-500 mt-0.5">⚠️</div>
+                                                <p className="text-[10px] text-amber-700 leading-relaxed italic">
+                                                    The system will check if a transaction with this <b>Reference ID</b> exists for the merchant.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </label>
+
                             {/* UPI Option */}
                             <label className={cn("relative flex flex-col p-6 cursor-pointer transition-colors", paymentMethod === 'upi' ? "bg-blue-50/10" : "hover:bg-slate-50")}>
                                 <div className="flex items-center gap-4">
@@ -298,11 +495,14 @@ export default function OrderSummary() {
                                 className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-all shadow-lg shadow-slate-900/10 active:scale-95 flex items-center justify-center gap-2 mt-4"
                             >
                                 {isProcessing ? (
-                                    <>Processing...</>
+                                    <>
+                                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                        {paymentMethod === 'wallet' ? 'Verifying...' : 'Processing...'}
+                                    </>
                                 ) : (
                                     <>
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                                        Pay {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalAmount)}
+                                        {paymentMethod === 'wallet' ? 'Confirm Payment Received' : `Pay ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalAmount)}`}
                                     </>
                                 )}
                             </Button>

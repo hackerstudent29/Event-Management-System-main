@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Objects;
 import java.util.UUID;
 
 @RestController
@@ -20,7 +21,7 @@ public class UserPreferencesController {
     @GetMapping
     public ResponseEntity<Dtos.UserPreferencesResponse> getPreferences(Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.ok(preferencesService.getPreferences(userId));
+        return ResponseEntity.ok(preferencesService.getPreferences(Objects.requireNonNull(userId)));
     }
 
     @PutMapping
@@ -28,6 +29,6 @@ public class UserPreferencesController {
             @RequestBody Dtos.UserPreferencesRequest request,
             Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.ok(preferencesService.updatePreferences(userId, request));
+        return ResponseEntity.ok(preferencesService.updatePreferences(Objects.requireNonNull(userId), request));
     }
 }

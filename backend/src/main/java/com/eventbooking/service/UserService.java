@@ -39,13 +39,24 @@ public class UserService {
     }
 
     @Transactional
-    public User updateProfile(UUID userId, String name, String phoneNumber, String profileImage) {
+    @SuppressWarnings("null")
+    public User updateProfile(UUID userId, String name, String phoneNumber, String profileImage,
+            String state, String district, Double latitude, Double longitude) {
         User user = getUser(userId);
-        user.setName(name);
-        user.setPhoneNumber(phoneNumber);
-        if (profileImage != null) {
+        if (name != null)
+            user.setName(name);
+        if (phoneNumber != null)
+            user.setPhoneNumber(phoneNumber);
+        if (profileImage != null)
             user.setProfileImage(profileImage);
-        }
+        if (state != null)
+            user.setState(state);
+        if (district != null)
+            user.setDistrict(district);
+        if (latitude != null)
+            user.setLatitude(latitude);
+        if (longitude != null)
+            user.setLongitude(longitude);
         return userRepository.save(user);
     }
 

@@ -49,8 +49,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/events/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/events/**").hasRole("ADMIN")
 
-                        // Booking & User endpoints
+                        // Booking, Payment & User endpoints
                         .requestMatchers("/api/bookings/**").authenticated()
+                        .requestMatchers("/api/payments/**").authenticated()
                         .requestMatchers("/api/users/**").authenticated()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

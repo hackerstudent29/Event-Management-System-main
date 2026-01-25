@@ -614,6 +614,29 @@ const EventDetail = () => {
                                     This event has already finished and is no longer available for booking.
                                 </p>
                             </div>
+                        ) : event.bookingOpenDate && new Date(event.bookingOpenDate) > new Date() ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center bg-blue-50/30 rounded-xl border-2 border-dashed border-blue-100">
+                                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 text-blue-500 animate-pulse">
+                                    <Clock className="w-8 h-8" />
+                                </div>
+                                <h3 className="text-lg font-bold text-slate-900 mb-1">Booking Opens Soon</h3>
+                                <p className="text-sm text-slate-600 mb-2">
+                                    Booking for this event will open on:
+                                </p>
+                                <div className="bg-white px-4 py-2 rounded-lg border border-blue-200 shadow-sm">
+                                    <span className="text-blue-600 font-black">
+                                        {new Date(event.bookingOpenDate).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </span>
+                                    <span className="mx-2 text-slate-300">|</span>
+                                    <span className="text-slate-900 font-bold">
+                                        {new Date(event.bookingOpenDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                </div>
+                                <div className="mt-6 flex items-center gap-2 text-[10px] font-bold text-blue-500 uppercase tracking-widest">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></div>
+                                    Stay Tuned
+                                </div>
+                            </div>
                         ) : (
                             <SeatSelection
                                 layout={seatLayout}

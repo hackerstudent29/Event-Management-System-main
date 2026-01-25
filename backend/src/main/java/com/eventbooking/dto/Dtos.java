@@ -30,6 +30,8 @@ public class Dtos {
         private UUID userId;
         private int seats;
         private java.util.List<String> seatIds;
+        private String paymentId;
+        private String razorpayOrderId;
     }
 
     @Data
@@ -37,6 +39,7 @@ public class Dtos {
         private String name;
         private String description;
         private String eventDate; // ISO format
+        private String bookingOpenDate; // ISO format
         private String eventType;
         private String locationName;
         private String locationAddress;
@@ -147,5 +150,32 @@ public class Dtos {
             this.cancellationUpdates = cancellationUpdates;
             this.promotionalEmails = promotionalEmails;
         }
+    }
+
+    @Data
+    public static class OrderRequest {
+        private double amount;
+        private String currency; // INR
+    }
+
+    @Data
+    public static class OrderResponse {
+        private String id; // Razorpay Order ID
+        private String currency;
+        private double amount;
+        private String status;
+    }
+
+    @Data
+    public static class PaymentVerificationRequest {
+        private String razorpayOrderId;
+        private String razorpayPaymentId;
+        private String razorpaySignature;
+    }
+
+    @Data
+    public static class WalletVerificationRequest {
+        private String merchantId;
+        private String referenceId;
     }
 }

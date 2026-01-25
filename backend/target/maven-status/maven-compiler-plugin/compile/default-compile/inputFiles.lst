@@ -1,5 +1,6 @@
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\model\Event.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\controller\AuthController.java
+D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\controller\UserPreferencesController.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\model\UserLocation.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\model\Booking.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\model\EventCategory.java
@@ -12,16 +13,19 @@ D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\config
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\security\JwtUtil.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\controller\UserController.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\SeatHoldRepository.java
+D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\model\UserPreferences.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\EventService.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\model\EmailOtp.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\BookingService.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\BookingRepository.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\UserRepository.java
+D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\controller\PaymentController.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\security\SecurityConfig.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\UserService.java
-D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\config\DataInitializer.java
+D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\PaymentService.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\dto\Dtos.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\EventBookingApplication.java
+D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\UserPreferencesRepository.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\security\JwtAuthenticationFilter.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\OtpService.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\EventCategoryRepository.java
@@ -34,3 +38,4 @@ D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\servic
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\controller\EventController.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\UserLocationRepository.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\exception\GlobalExceptionHandler.java
+D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\UserPreferencesService.java

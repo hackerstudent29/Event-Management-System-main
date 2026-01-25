@@ -26,12 +26,24 @@ public class UserController {
     @PutMapping("/profile/{userId}")
     public ResponseEntity<User> updateProfile(
             @PathVariable UUID userId,
-            @RequestBody Map<String, String> updates) {
+            @RequestBody Map<String, Object> updates) {
+
+        Double lat = null;
+        Double lng = null;
+        if (updates.get("latitude") != null)
+            lat = Double.valueOf(updates.get("latitude").toString());
+        if (updates.get("longitude") != null)
+            lng = Double.valueOf(updates.get("longitude").toString());
+
         return ResponseEntity.ok(userService.updateProfile(
                 userId,
-                updates.get("name"),
-                updates.get("phoneNumber"),
-                updates.get("profileImage")));
+                (String) updates.get("name"),
+                (String) updates.get("phoneNumber"),
+                (String) updates.get("profileImage"),
+                (String) updates.get("state"),
+                (String) updates.get("district"),
+                lat,
+                lng));
     }
 
     @PostMapping("/profile/{userId}/password/otp")

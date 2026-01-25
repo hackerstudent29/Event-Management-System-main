@@ -45,6 +45,18 @@ public class User {
     @Column(name = "profile_image")
     private String profileImage;
 
+    @Column(name = "state")
+    private String state;
+
+    @Column(name = "district")
+    private String district;
+
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

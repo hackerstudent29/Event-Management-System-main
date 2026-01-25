@@ -55,6 +55,15 @@ public class BookingService {
             throw new RuntimeException("Booking closed. This event has already finished.");
         }
 
+        // Reject bookings before opening time
+        if (freshCat.getEvent().getBookingOpenDate() != null
+                && freshCat.getEvent().getBookingOpenDate().isAfter(java.time.LocalDateTime.now())) {
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter
+                    .ofPattern("dd MMM yyyy, hh:mm a");
+            throw new RuntimeException(
+                    "Booking for this event opens on " + freshCat.getEvent().getBookingOpenDate().format(formatter));
+        }
+
         if (freshCat.getAvailableSeats() < request.getSeats()) {
             throw new RuntimeException(String.format(
                     "Not enough seats available in category '%s'. Requested: %d, Available: %d",
@@ -87,6 +96,8 @@ public class BookingService {
         booking.setSeatsBooked(request.getSeats());
         booking.setSeatIdentifiers(request.getSeatIds() != null ? String.join(", ", request.getSeatIds()) : "");
         booking.setStatus("CONFIRMED");
+        booking.setPaymentId(request.getPaymentId());
+        booking.setRazorpayOrderId(request.getRazorpayOrderId());
 
         // Clear existing hold for this user before saving confirmed booking
         seatHoldRepository.deleteByUserIdAndEventCategoryId(user.getId(), category.getId());
@@ -110,7 +121,12 @@ public class BookingService {
             throw new RuntimeException("Cannot hold seats for a past event.");
         }
 
-        hold.setExpiresAt(java.time.LocalDateTime.now().plusSeconds(15)); // 15 second hold
+        if (category.getEvent().getBookingOpenDate() != null
+                && category.getEvent().getBookingOpenDate().isAfter(java.time.LocalDateTime.now())) {
+            throw new RuntimeException("Booking is not yet open.");
+        }
+
+        hold.setExpiresAt(java.time.LocalDateTime.now().plusSeconds(300)); // 5 minute hold
         seatHoldRepository.save(hold);
 
         // Periodic cleanup of expired holds - can be moved to a scheduler but for MVP

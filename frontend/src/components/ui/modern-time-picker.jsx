@@ -62,7 +62,7 @@ export function ModernTimePicker({ value, onChange, minTime, disabled }) {
     };
 
     const hoursList = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0"));
-    const minutesList = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, "0"));
+    const minutesList = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, "0"));
     const periods = ["AM", "PM"];
 
     const hRef = React.useRef(null);

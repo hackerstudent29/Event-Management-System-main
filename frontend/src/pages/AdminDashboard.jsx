@@ -6,7 +6,7 @@ import { DropdownCalendar } from '@/components/ui/dropdown-calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { CalendarIcon, ChevronDown, Search } from 'lucide-react';
+import { CalendarIcon, ChevronDown, Search, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { OrbitalClock } from '@/components/ui/orbital-clock';
 import { ModernTimePicker } from '@/components/ui/modern-time-picker';
@@ -62,7 +62,7 @@ const ASPECT_RATIOS = [
 
 import { CropImageDialog } from '@/components/ui/crop-image-modal';
 
-const EventImageUpload = ({ value, onChange, aspectRatio = '2/3', onAspectRatioChange }) => {
+const EventImageUpload = ({ value, onChange, aspectRatio = '2/3', onAspectRatioChange, onError, onUploadStart, onUploadEnd }) => {
     const {
         fileName,
         error,
@@ -101,16 +101,19 @@ const EventImageUpload = ({ value, onChange, aspectRatio = '2/3', onAspectRatioC
     const handleCropComplete = async (croppedBlob) => {
         if (!croppedBlob) return;
         setUploading(true);
+        if (onUploadStart) onUploadStart();
         try {
             console.log("Starting upload for cropped file");
             const fileExt = "jpg"; // Cropper output is jpeg
-            const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-            const filePath = `event-posters/${fileName}`;
+            const fileName = `${Math.random().toString(36).substring(2, 11)}_${Date.now()}.${fileExt}`;
+            const filePath = `images/${fileName}`;
 
             const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('event-images')
                 .upload(filePath, croppedBlob, {
-                    contentType: 'image/jpeg'
+                    contentType: 'image/jpeg',
+                    upsert: true,
+                    cacheControl: '3600'
                 });
 
             if (uploadError) {
@@ -126,17 +129,19 @@ const EventImageUpload = ({ value, onChange, aspectRatio = '2/3', onAspectRatioC
             onChange(data.publicUrl);
             setPreviewUrl(data.publicUrl); // Show new image immediately
 
-            // We keep 'file' state in hook but we have processed it. 
-            // If we clearFile(), 'file' becomes null. 
-            // Effect above depends on 'file'. If null, nothing happens.
-            // We should clear it to allow selecting same file again if needed or just cleanup.
             clearFile();
 
         } catch (error) {
             console.error('Error uploading event poster:', error);
+            if (onError) {
+                onError(error.message || "Failed to upload image");
+            } else {
+                alert("Failed to upload image. Please try again. Error: " + error.message);
+            }
             clearFile();
         } finally {
             setUploading(false);
+            if (onUploadEnd) onUploadEnd();
             setCropOpen(false);
         }
     };
@@ -225,6 +230,14 @@ const EventImageUpload = ({ value, onChange, aspectRatio = '2/3', onAspectRatioC
                     </div>
                 </div>
             )}
+            {previewUrl && (
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded border border-green-100">Ready</span>
+                    <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:underline flex items-center gap-1">
+                        Verify URL <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                </div>
+            )}
             {error && (
                 <p className="text-sm text-red-500">
                     Error: {error}
@@ -267,6 +280,8 @@ const AdminDashboard = () => {
     const [selectedEvents, setSelectedEvents] = useState([]);
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
 
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+
     // Get sport-specific categories based on selected event subtype
     const availableCategories = React.useMemo(() => {
         // For Stadium events, use sport-specific categories
@@ -286,6 +301,8 @@ const AdminDashboard = () => {
     // Helper state for Date Picker
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedTime, setSelectedTime] = useState("10:00");
+    const [bookingOpenDate, setBookingOpenDate] = useState(null);
+    const [bookingOpenTime, setBookingOpenTime] = useState("10:00");
     const [clockDate, setClockDate] = useState(new Date());
 
     // Auto-generate zone map for display
@@ -357,10 +374,25 @@ const AdminDashboard = () => {
                 const minutes = d.getMinutes().toString().padStart(2, '0');
                 setSelectedTime(`${hours}:${minutes}`);
             }
+
+            if (event.bookingOpenDate) {
+                const bod = new Date(event.bookingOpenDate);
+                if (!isNaN(bod.getTime())) {
+                    setBookingOpenDate(bod);
+                    const hours = bod.getHours().toString().padStart(2, '0');
+                    const minutes = bod.getMinutes().toString().padStart(2, '0');
+                    setBookingOpenTime(`${hours}:${minutes}`);
+                }
+            } else {
+                setBookingOpenDate(null);
+                setBookingOpenTime("10:00");
+            }
         } else if (!newEvent.id && !newEvent.eventDate) {
             // Only reset to defaults if we are explicitly clearing/resetting the whole form
             setSelectedDate(null);
             setSelectedTime("10:00");
+            setBookingOpenDate(null);
+            setBookingOpenTime("10:00");
         }
     }, [newEvent.id]);
 
@@ -509,7 +541,13 @@ const AdminDashboard = () => {
                 latitude: newEvent.latitude,
                 longitude: newEvent.longitude,
                 eventSubType: newEvent.eventSubType,
-                seatingLayoutVariant: newEvent.seatingLayoutVariant
+                seatingLayoutVariant: newEvent.seatingLayoutVariant,
+                bookingOpenDate: bookingOpenDate ? (() => {
+                    const pad = (n) => n.toString().padStart(2, '0');
+                    const bod = new Date(bookingOpenDate);
+                    const [bh, bm] = bookingOpenTime.split(':').map(Number);
+                    return `${bod.getFullYear()}-${pad(bod.getMonth() + 1)}-${pad(bod.getDate())}T${pad(bh)}:${pad(bm)}:00`;
+                })() : null
             };
 
             console.log("Submitting Event Payload:", payload);
@@ -531,6 +569,8 @@ const AdminDashboard = () => {
             setNewEvent({ name: '', description: '', eventDate: '', eventType: '', eventSubType: '', seatingLayoutVariant: '' });
             setSelectedDate(null);
             setSelectedTime("10:00");
+            setBookingOpenDate(null);
+            setBookingOpenTime("10:00");
             setZoneConfigs({}); // Reset zone configurations
         } catch (error) {
             console.error("Event Creation/Update Error Full:", error);
@@ -784,9 +824,12 @@ const AdminDashboard = () => {
                                     <label className="text-sm font-medium text-slate-700">Event Poster</label>
                                     <EventImageUpload
                                         value={newEvent.imageUrl}
-                                        onChange={(url) => setNewEvent({ ...newEvent, imageUrl: url })}
+                                        onChange={(url) => setNewEvent(prev => ({ ...prev, imageUrl: url }))}
                                         aspectRatio={newEvent.imageAspectRatio}
-                                        onAspectRatioChange={(ratio) => setNewEvent({ ...newEvent, imageAspectRatio: ratio })}
+                                        onAspectRatioChange={(ratio) => setNewEvent(prev => ({ ...prev, imageAspectRatio: ratio }))}
+                                        onError={(msg) => showAlert('Upload Failed', msg, 'error')}
+                                        onUploadStart={() => setIsUploadingImage(true)}
+                                        onUploadEnd={() => setIsUploadingImage(false)}
                                     />
                                 </div>
 
@@ -888,7 +931,7 @@ const AdminDashboard = () => {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-slate-700">Start Time</label>
+                                        <label className="text-sm font-medium text-slate-700">Event Start Time</label>
                                         <ModernTimePicker
                                             value={selectedTime}
                                             onChange={setSelectedTime}
@@ -897,6 +940,44 @@ const AdminDashboard = () => {
                                                 if (!selectedDate) return null;
                                                 const now = new Date();
                                                 const sel = new Date(selectedDate);
+                                                if (sel.setHours(0, 0, 0, 0) !== now.setHours(0, 0, 0, 0)) return null;
+
+                                                const future = new Date();
+                                                future.setHours(future.getHours() + 3);
+
+                                                // If +3 hours is tomorrow, disable all of today
+                                                if (future.getDate() !== new Date().getDate()) return "24:00";
+
+                                                return `${future.getHours().toString().padStart(2, '0')}:${future.getMinutes().toString().padStart(2, '0')}`;
+                                            })()}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 pb-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                            <CalendarIcon className="w-4 h-4" />
+                                            Booking Open Date
+                                        </label>
+                                        <ModernDatePicker
+                                            date={bookingOpenDate}
+                                            setDate={setBookingOpenDate}
+                                            disabled={(date) => date < new Date().setHours(0, 0, 0, 0)}
+                                        />
+                                        <p className="text-[10px] text-slate-400">Leave empty to open booking immediately.</p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-slate-700">Booking Open Time</label>
+                                        <ModernTimePicker
+                                            value={bookingOpenTime}
+                                            onChange={setBookingOpenTime}
+                                            disabled={!bookingOpenDate}
+                                            minTime={(() => {
+                                                if (!bookingOpenDate) return null;
+                                                const now = new Date();
+                                                const sel = new Date(bookingOpenDate);
                                                 if (sel.setHours(0, 0, 0, 0) !== now.setHours(0, 0, 0, 0)) return null;
 
                                                 const future = new Date();
@@ -1121,9 +1202,10 @@ const AdminDashboard = () => {
                     <div className="p-6 bg-slate-50/50 border-t border-slate-100 flex gap-4">
                         <button
                             type="submit"
-                            className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl shadow-lg shadow-slate-900/10 transition-all hover:-translate-y-0.5"
+                            disabled={isUploadingImage}
+                            className={`flex-1 font-bold py-4 rounded-xl shadow-lg shadow-slate-900/10 transition-all hover:-translate-y-0.5 ${isUploadingImage ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800 text-white'}`}
                         >
-                            {newEvent.id ? 'Update Event Details' : 'Create New Event'}
+                            {isUploadingImage ? 'Uploading Image...' : (newEvent.id ? 'Update Event Details' : 'Create New Event')}
                         </button>
 
                         {newEvent.id && (

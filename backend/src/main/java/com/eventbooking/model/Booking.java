@@ -36,6 +36,12 @@ public class Booking {
     @Column(nullable = false)
     private String status; // CONFIRMED, CANCELLED
 
+    @Column(name = "payment_id")
+    private String paymentId;
+
+    @Column(name = "razorpay_order_id")
+    private String razorpayOrderId;
+
     @Column(name = "checked_in", nullable = false)
     private boolean checkedIn = false;
 

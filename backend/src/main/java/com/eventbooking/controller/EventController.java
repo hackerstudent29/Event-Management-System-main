@@ -22,6 +22,14 @@ public class EventController {
         return ResponseEntity.ok(eventService.getAllEvents());
     }
 
+    @GetMapping("/nearby")
+    public ResponseEntity<List<Event>> getNearbyEvents(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "100") double radius) {
+        return ResponseEntity.ok(eventService.getEventsNearUser(lat, lng, radius));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Event> getEvent(@PathVariable UUID id) {
         return ResponseEntity.ok(eventService.getEvent(Objects.requireNonNull(id)));

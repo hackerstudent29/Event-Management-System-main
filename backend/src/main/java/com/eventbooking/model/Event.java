@@ -35,6 +35,9 @@ public class Event {
     @Column(name = "event_date", nullable = false)
     private LocalDateTime eventDate;
 
+    @Column(name = "booking_open_date")
+    private LocalDateTime bookingOpenDate;
+
     @Column(name = "event_type")
     private String eventType;
 

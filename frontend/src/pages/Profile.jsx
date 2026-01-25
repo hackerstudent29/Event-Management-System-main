@@ -25,6 +25,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { LOCATION_DATA } from '../lib/location-data';
 
 const SectionTitle = ({ children, icon: Icon }) => (
     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
@@ -47,7 +48,7 @@ const StatCard = ({ label, value, icon: Icon, colorClass }) => (
 
 
 const Profile = () => {
-    const { user, logout } = useAuth();
+    const { user, logout, updateUser } = useAuth();
     const navigate = useNavigate();
     const { showMessage } = useMessage();
 
@@ -72,6 +73,8 @@ const Profile = () => {
     const [editName, setEditName] = useState('');
     const [editPhone, setEditPhone] = useState('');
     const [editImage, setEditImage] = useState('');
+    const [editState, setEditState] = useState('');
+    const [editDistrict, setEditDistrict] = useState('');
     const [isUploading, setIsUploading] = useState(false);
 
     const handleAvatarChange = async (file) => {
@@ -129,6 +132,8 @@ const Profile = () => {
             setEditName(userRes.data.name || '');
             setEditPhone(userRes.data.phoneNumber || '');
             setEditImage(userRes.data.profileImage || '');
+            setEditState(userRes.data.state || '');
+            setEditDistrict(userRes.data.district || '');
 
         } catch (err) {
             console.error("Failed to load profile data", err);
@@ -154,11 +159,35 @@ const Profile = () => {
 
     const handleUpdateProfile = async () => {
         try {
+            let lat = null;
+            let lng = null;
+            if (editState && editDistrict && LOCATION_DATA[editState] && LOCATION_DATA[editState][editDistrict]) {
+                const coords = LOCATION_DATA[editState][editDistrict];
+                lat = coords.lat;
+                lng = coords.lng;
+            }
+
             await api.put(`/users/profile/${user.id}`, {
                 name: editName,
                 phoneNumber: editPhone,
-                profileImage: editImage
+                profileImage: editImage,
+                state: editState,
+                district: editDistrict,
+                latitude: lat,
+                longitude: lng
             });
+
+            // Update global context so other components (like LocationModal) know about the change
+            updateUser({
+                name: editName,
+                phoneNumber: editPhone,
+                profileImage: editImage,
+                state: editState,
+                district: editDistrict,
+                latitude: lat,
+                longitude: lng
+            });
+
             showMessage("Profile updated successfully", { type: 'success' });
             setShowEditProfileModal(false);
             fetchData();
@@ -283,6 +312,35 @@ const Profile = () => {
                                     </div>
                                     <div><label className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1 block">Full Name</label><input value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm" /></div>
                                     <div><label className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1 block">Phone Number</label><input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm" /></div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1 block">State</label>
+                                        <Select onValueChange={setEditState} value={editState}>
+                                            <SelectTrigger className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm h-10">
+                                                <SelectValue placeholder="Select State" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {Object.keys(LOCATION_DATA).map(state => (
+                                                    <SelectItem key={state} value={state}>{state}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {editState && (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1 block">District</label>
+                                            <Select onValueChange={setEditDistrict} value={editDistrict}>
+                                                <SelectTrigger className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm h-10">
+                                                    <SelectValue placeholder="Select District" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {Object.keys(LOCATION_DATA[editState] || {}).map(dist => (
+                                                        <SelectItem key={dist} value={dist}>{dist}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
                                     <div className="flex gap-3 pt-2"><Button variant="outline" className="flex-1" onClick={() => setShowEditProfileModal(false)}>Cancel</Button><Button className="flex-1" onClick={handleUpdateProfile}>Save Changes</Button></div>
                                 </div>
                             </motion.div>
@@ -449,6 +507,12 @@ const Profile = () => {
                                     {fullUser?.emailVerified ? 'Verified Account' : 'Action Required: Verify Email'}
                                 </span>
                             </div>
+                            {user?.state && (
+                                <div className="flex items-center gap-3 text-sm">
+                                    <MapPin className="w-4 h-4 text-slate-400" />
+                                    <span className="text-slate-600">{user.district ? `${user.district}, ` : ''}{user.state}</span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="mt-8 flex flex-col gap-2">

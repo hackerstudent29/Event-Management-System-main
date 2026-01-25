@@ -34,11 +34,18 @@ public class EventService {
                 .orElseThrow(() -> new RuntimeException("Event not found"));
     }
 
+    public List<Event> getEventsNearUser(double lat, double lng, double radiusKm) {
+        return eventRepository.findEventsWithinRadius(lat, lng, radiusKm);
+    }
+
     public Event createEvent(Dtos.EventRequest request) {
         Event event = new Event();
         event.setName(request.getName());
         event.setDescription(request.getDescription());
         event.setEventDate(LocalDateTime.parse(request.getEventDate()));
+        if (request.getBookingOpenDate() != null && !request.getBookingOpenDate().isEmpty()) {
+            event.setBookingOpenDate(LocalDateTime.parse(request.getBookingOpenDate()));
+        }
         event.setEventType(request.getEventType());
         event.setLocationName(request.getLocationName());
         event.setLocationAddress(request.getLocationAddress());
@@ -123,6 +130,9 @@ public class EventService {
         event.setName(request.getName());
         event.setDescription(request.getDescription());
         event.setEventDate(LocalDateTime.parse(request.getEventDate()));
+        if (request.getBookingOpenDate() != null) {
+            event.setBookingOpenDate(LocalDateTime.parse(request.getBookingOpenDate()));
+        }
         event.setEventType(request.getEventType());
         event.setLocationName(request.getLocationName());
         event.setLocationAddress(request.getLocationAddress());

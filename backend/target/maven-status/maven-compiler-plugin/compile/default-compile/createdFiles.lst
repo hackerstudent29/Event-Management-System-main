@@ -1,10 +1,12 @@
 com\eventbooking\service\CustomUserDetailsService.class
+com\eventbooking\controller\MaintenanceController.class
 com\eventbooking\security\JwtAuthenticationFilter.class
 com\eventbooking\dto\OtpDtos$ResetPasswordRequest.class
 com\eventbooking\config\StorageInitializer.class
 com\eventbooking\controller\AuthController.class
 com\eventbooking\security\JwtUtil.class
 com\eventbooking\repository\EventRepository.class
+com\eventbooking\dto\Dtos$UserPreferencesResponse.class
 com\eventbooking\dto\Dtos$GoogleLoginRequest.class
 com\eventbooking\dto\Dtos$RegisterRequest.class
 com\eventbooking\repository\EventCategoryRepository.class
@@ -19,6 +21,7 @@ com\eventbooking\dto\Dtos$LoginResponse.class
 com\eventbooking\service\BookingService.class
 com\eventbooking\model\EventCategory.class
 com\eventbooking\dto\OtpDtos$VerifyOtpRequest.class
+com\eventbooking\dto\Dtos$UserPreferencesRequest.class
 com\eventbooking\repository\UserRepository.class
 com\eventbooking\model\Booking.class
 com\eventbooking\model\User.class
@@ -28,13 +31,15 @@ com\eventbooking\dto\Dtos$DashboardStats.class
 com\eventbooking\service\OtpService.class
 com\eventbooking\controller\UserController.class
 com\eventbooking\controller\BookingController.class
+com\eventbooking\model\UserPreferences.class
+com\eventbooking\service\UserPreferencesService.class
 com\eventbooking\controller\EventController.class
 com\eventbooking\model\EmailOtp.class
 com\eventbooking\model\SeatHold.class
 com\eventbooking\dto\Dtos$EventRequest.class
 com\eventbooking\dto\Dtos.class
-com\eventbooking\config\DataInitializer.class
 com\eventbooking\exception\GlobalExceptionHandler.class
+com\eventbooking\repository\UserPreferencesRepository.class
 com\eventbooking\dto\Dtos$CategoryRequest.class
 com\eventbooking\repository\UserLocationRepository.class
 com\eventbooking\model\UserLocation.class
@@ -45,6 +50,7 @@ com\eventbooking\dto\OtpDtos$ForgotPasswordRequest.class
 com\eventbooking\repository\BookingRepository.class
 com\eventbooking\service\EventService.class
 com\eventbooking\controller\AuthController$1.class
+com\eventbooking\controller\UserPreferencesController.class
 com\eventbooking\service\AuthService.class
 com\eventbooking\security\SecurityConfig.class
 com\eventbooking\EventBookingApplication.class
