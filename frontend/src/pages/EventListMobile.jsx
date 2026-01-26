@@ -27,7 +27,11 @@ const EventListMobile = () => {
             try {
                 let res;
                 if (user && user.latitude && user.longitude) {
-                    res = await api.get(`/events/nearby?lat=${user.latitude}&lng=${user.longitude}&radius=100`);
+                    // Increased radius to 500km and added fallback to all events if none nearby
+                    res = await api.get(`/events/nearby?lat=${user.latitude}&lng=${user.longitude}&radius=500`);
+                    if (!res.data || res.data.length === 0) {
+                        res = await api.get('/events');
+                    }
                 } else {
                     res = await api.get('/events');
                 }

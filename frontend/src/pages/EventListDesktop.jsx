@@ -27,8 +27,13 @@ const EventListDesktop = () => {
             try {
                 let res;
                 if (user && user.latitude && user.longitude) {
-                    // Fetch nearby events if location is set
-                    res = await api.get(`/events/nearby?lat=${user.latitude}&lng=${user.longitude}&radius=100`);
+                    // Fetch nearby events if location is set - increased radius to 500km for demo
+                    res = await api.get(`/events/nearby?lat=${user.latitude}&lng=${user.longitude}&radius=500`);
+
+                    // Fallback: If no events nearby, show all events
+                    if (!res.data || res.data.length === 0) {
+                        res = await api.get('/events');
+                    }
                 } else {
                     // Default fetch all
                     res = await api.get('/events');
