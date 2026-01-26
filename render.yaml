@@ -26,3 +26,5 @@ services:
         value: eventbooking.otp@gmail.com
       - key: SPRING_MAIL_PASSWORD
         sync: false
+      - key: WALLET_SERVICE_URL
+        value: https://wallet-service-placeholder.onrender.com

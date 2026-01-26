@@ -25,7 +25,8 @@ public class PaymentService {
     @Value("${razorpay.key.secret}")
     private String keySecret;
 
-    private RazorpayClient client;
+    @Value("${wallet.service.url:http://localhost:5000}")
+    private String walletServiceUrl;
 
     @PostConstruct
     public void init() throws RazorpayException {
@@ -64,7 +65,7 @@ public class PaymentService {
 
     public Object verifyWalletPayment(Dtos.WalletVerificationRequest request) {
         RestTemplate restTemplate = new RestTemplate();
-        String url = "http://localhost:5000/api/external/verify-reference";
+        String url = walletServiceUrl + "/api/external/verify-reference";
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url)
                 .queryParam("merchantId", request.getMerchantId())
@@ -83,7 +84,7 @@ public class PaymentService {
 
     public Dtos.WalletTransferResponse initiateWalletTransfer(Dtos.WalletTransferInitiationRequest request) {
         RestTemplate restTemplate = new RestTemplate();
-        String url = "http://localhost:5000/api/wallet/transfer";
+        String url = walletServiceUrl + "/api/wallet/transfer";
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");

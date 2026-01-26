@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { io } from "socket.io-client";
+import SockJS from "sockjs-client";
+import { Client } from "@stomp/stompjs";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CreditCard, MapPin, Ticket, ChevronLeft, Calendar as CalendarIcon, Clock } from "lucide-react";
@@ -78,31 +79,48 @@ export default function OrderSummary() {
     const gstAmount = Number((convenienceFee * 0.18).toFixed(2));
     const totalAmount = ticketPrice + convenienceFee + gstAmount;
 
-    const [socket, setSocket] = useState(null);
-
     React.useEffect(() => {
-        // Initialize Socket.IO connection
-        const newSocket = io("http://localhost:8085");
-        setSocket(newSocket);
+        // Initialize STOMP connection
+        const backendUrl = import.meta.env.VITE_API_BASE_URL || 'https://zendrum-backend.onrender.com/api';
+        const wsUrl = backendUrl.replace('/api', '/ws-payment');
 
-        newSocket.on("connect", () => {
-            console.log("Connected to Payment Socket");
-            newSocket.emit("join_order", referenceId);
+        const stompClient = new Client({
+            webSocketFactory: () => new SockJS(wsUrl),
+            debug: (str) => {
+                console.log("[STOMP] " + str);
+            },
+            reconnectDelay: 5000,
+            heartbeatIncoming: 4000,
+            heartbeatOutgoing: 4000,
         });
 
-        newSocket.on("payment_update", (data) => {
-            console.log("Received Payment Update:", data);
-            if (data.status === 'SUCCESS') {
-                showMessage("Payment Successful (via Real-time)!", { type: 'success' });
-                setBookingConfirmed(true);
-            } else {
-                showMessage(data.reason || "Payment Failed.", { type: 'error' });
+        stompClient.onConnect = (frame) => {
+            console.log("Connected to Payment WebSocket via STOMP");
+            stompClient.subscribe("/topic/payment/" + referenceId, (message) => {
+                const data = JSON.parse(message.body);
+                console.log("Received Payment Update (STOMP):", data);
+                if (data.status === 'SUCCESS') {
+                    showMessage("Payment Successful (via Real-time)!", { type: 'success' });
+                    setBookingConfirmed(true);
+                } else {
+                    showMessage(data.reason || "Payment Failed.", { type: 'error' });
+                }
+                setIsProcessing(false);
+            });
+        };
+
+        stompClient.onStompError = (frame) => {
+            console.error("STOMP error", frame.body);
+        };
+
+        stompClient.activate();
+
+        return () => {
+            if (stompClient.active) {
+                stompClient.deactivate();
             }
-            setIsProcessing(false);
-        });
-
-        return () => newSocket.close();
-    }, [referenceId]);
+        };
+    }, [referenceId, showMessage]);
 
     const handleWalletPayment = async () => {
         setIsProcessing(true);
@@ -113,7 +131,7 @@ export default function OrderSummary() {
             const merchantId = "f294121c-2340-4e91-bf65-b550a6e0d81a";
 
             // Call Website A Backend to initiate the server-to-server transfer
-            await api.post('/api/payments/initiate-wallet-transfer', {
+            await api.post('/payments/initiate-wallet-transfer', {
                 fromUserId: user.id, // Current logged in user
                 toWalletId: merchantId,
                 amount: totalAmount,
@@ -147,7 +165,7 @@ export default function OrderSummary() {
         setIsProcessing(true);
         try {
             // 1. Create Order on Backend
-            const orderRes = await api.post('/api/payments/create-order', {
+            const orderRes = await api.post('/payments/create-order', {
                 amount: totalAmount,
                 currency: "INR"
             });
@@ -183,7 +201,7 @@ export default function OrderSummary() {
                 handler: async function (response) {
                     // This function handles the success response from Razorpay
                     try {
-                        const verifyRes = await api.post('/api/payments/verify', {
+                        const verifyRes = await api.post('/payments/verify', {
                             razorpayOrderId: response.razorpay_order_id,
                             razorpayPaymentId: response.razorpay_payment_id,
                             razorpaySignature: response.razorpay_signature
@@ -192,7 +210,7 @@ export default function OrderSummary() {
                         if (verifyRes.data === true) {
                             // 4. Confirm Booking on Backend with Payment Details
                             await Promise.all(
-                                bookingPayload.map(payload => api.post('/api/bookings', {
+                                bookingPayload.map(payload => api.post('/bookings', {
                                     ...payload,
                                     paymentId: response.razorpay_payment_id,
                                     razorpayOrderId: response.razorpay_order_id
