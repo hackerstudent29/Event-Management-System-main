@@ -28,6 +28,8 @@ public class PaymentService {
     @Value("${wallet.service.url:http://localhost:5000}")
     private String walletServiceUrl;
 
+    private RazorpayClient client;
+
     @PostConstruct
     public void init() throws RazorpayException {
         this.client = new RazorpayClient(keyId, keySecret);
