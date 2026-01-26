@@ -59,7 +59,9 @@ com\eventbooking\dto\Dtos$ScanResponse.class
 com\eventbooking\dto\OtpDtos$ForgotPasswordRequest.class
 com\eventbooking\repository\BookingRepository.class
 com\eventbooking\service\EventService.class
+com\eventbooking\config\WebSocketConfig.class
 com\eventbooking\controller\AuthController$1.class
+com\eventbooking\controller\WebhookController.class
 com\eventbooking\controller\UserPreferencesController.class
 com\eventbooking\service\AuthService.class
 com\eventbooking\security\SecurityConfig.class

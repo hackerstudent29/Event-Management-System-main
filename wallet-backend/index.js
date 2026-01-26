@@ -18,6 +18,7 @@ const pool = new Pool({
     password: process.env.DB_PASSWORD || 'password',
     database: process.env.DB_NAME || 'event_booking',
     port: process.env.DB_PORT || 5432,
+    connectionString: process.env.DATABASE_URL // Prefer connectionString if provided
 });
 
 pool.on('error', (err, client) => {
@@ -43,7 +44,6 @@ app.use((req, res, next) => {
 
 /**
  * Wallet Transfer (Server-to-Server)
- * Processes atomic transfer of coins between wallets
  */
 app.post('/api/wallet/transfer', async (req, res) => {
     const { fromUserId, toWalletId, amount, reference } = req.body;
@@ -57,13 +57,11 @@ app.post('/api/wallet/transfer', async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // 1. Get Source Wallet (and lock it)
         let sourceRes = await client.query(
             'SELECT id, balance FROM wallets WHERE user_id = $1 FOR UPDATE',
             [fromUserId]
         );
 
-        // [DEMO ONLY] Auto-create wallet if not exists for easier testing
         if (sourceRes.rows.length === 0) {
             console.log(`[DEMO] Creating new wallet for user ${fromUserId}`);
             await client.query(
@@ -78,18 +76,15 @@ app.post('/api/wallet/transfer', async (req, res) => {
 
         const sourceWallet = sourceRes.rows[0];
 
-        // 2. Check Balance
         if (parseFloat(sourceWallet.balance) < parseFloat(amount)) {
-            // Record failed transaction
             await client.query(
                 'INSERT INTO transactions (from_wallet_id, to_wallet_id, amount, reference, type, status, reason) VALUES ($1, $2, $3, $4, $5, $6, $7)',
                 [sourceWallet.id, toWalletId, amount, reference, 'TRANSFER', 'FAILED', 'INSUFFICIENT_BALANCE']
             );
-            await client.query('COMMIT'); // Commit the failure log
+            await client.query('COMMIT');
             return res.status(400).json({ status: 'FAILED', reason: 'INSUFFICIENT_BALANCE' });
         }
 
-        // 3. Get/Verify Destination Wallet
         const destRes = await client.query(
             'SELECT id FROM wallets WHERE id = $1 FOR UPDATE',
             [toWalletId]
@@ -100,20 +95,16 @@ app.post('/api/wallet/transfer', async (req, res) => {
             return res.status(404).json({ status: 'FAILED', reason: 'DESTINATION_WALLET_NOT_FOUND' });
         }
 
-        // 4. Perform Transfer
-        // Deduct
         await client.query(
             'UPDATE wallets SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
             [amount, sourceWallet.id]
         );
 
-        // Credit
         await client.query(
             'UPDATE wallets SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
             [amount, toWalletId]
         );
 
-        // 5. Record Successful Transaction
         const txnRes = await client.query(
             'INSERT INTO transactions (from_wallet_id, to_wallet_id, amount, reference, type, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
             [sourceWallet.id, toWalletId, amount, reference, 'TRANSFER', 'SUCCESS']
@@ -170,7 +161,7 @@ const server = app.listen(port, () => {
     console.log(`Wallet App Backend running on http://localhost:${port}`);
 });
 
-// Setup Socket.IO (requested for real-time updates)
+// Setup Socket.IO
 const io = require('socket.io')(server, {
     cors: { origin: "*" }
 });
@@ -188,11 +179,10 @@ io.on('connection', (socket) => {
     });
 });
 
-// Export io to be used in routes if needed (e.g. notify balance change)
 app.set('socketio', io);
 
 // ============================================
-// PAYMENT GATEWAY API (v1)
+// PAYMENT GATEWAY API
 // ============================================
 
 const { authenticateApiKey, logApiRequest } = require('./middleware/auth');
@@ -201,14 +191,18 @@ const WebhookService = require('./services/webhook');
 
 // Initialize webhook service
 const webhookService = new WebhookService(pool);
-webhookService.startRetryWorker(); // Start background retry worker
+webhookService.startRetryWorker();
 
-// Payment Gateway API v1
+// API Router
 const paymentRouter = createPaymentRoutes(pool, webhookService);
+
+// 1. External API (Guide format: /api/external/...)
+app.use('/api/external', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+
+// 2. Legacy/Internal API (v1 format: /api/v1/payments/...)
 app.use('/api/v1/payments', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
 
-console.log('[API] Payment Gateway v1 endpoints registered');
+console.log('[API] Payment Gateway endpoints registered');
+console.log('  POST /api/external/create-request');
+console.log('  GET  /api/external/verify-reference');
 console.log('  POST /api/v1/payments/create');
-console.log('  GET  /api/v1/payments/:payment_id');
-console.log('  POST /api/v1/payments/:payment_id/complete');
-console.log('  POST /api/v1/payments/:payment_id/fail');

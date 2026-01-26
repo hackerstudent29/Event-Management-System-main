@@ -7,27 +7,20 @@ const router = express.Router();
  */
 function createPaymentRoutes(pool, webhookService) {
 
-    /**
-     * POST /api/v1/payments/create
-     * Create a new payment request
-     */
+    // --- V1 ENDPOINTS (Internal/Legacy) ---
+
     router.post('/create', async (req, res) => {
         const { amount, currency = 'COIN', reference, callback_url } = req.body;
-        const app = req.app; // From auth middleware
+        const app = req.app;
 
-        // Validation
         if (!amount || amount <= 0) {
-            return res.status(400).json({
-                error: 'invalid_request',
-                message: 'Amount must be greater than 0'
-            });
+            return res.status(400).json({ error: 'invalid_request', message: 'Amount must be greater than 0' });
         }
 
         try {
             const paymentId = generatePaymentId();
-            const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+            const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
-            // Insert payment
             const result = await pool.query(
                 `INSERT INTO payments (payment_id, app_id, amount, currency, reference, expires_at, status)
                  VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')
@@ -36,9 +29,6 @@ function createPaymentRoutes(pool, webhookService) {
             );
 
             const payment = result.rows[0];
-
-            console.log(`[PAYMENT] Created: ${payment.payment_id} for ${app.app_id} (₹${amount})`);
-
             return res.status(201).json({
                 payment_id: payment.payment_id,
                 status: payment.status,
@@ -48,20 +38,12 @@ function createPaymentRoutes(pool, webhookService) {
                 expires_at: payment.expires_at,
                 created_at: payment.created_at
             });
-
         } catch (error) {
             console.error('Error creating payment:', error);
-            return res.status(500).json({
-                error: 'internal_error',
-                message: 'Failed to create payment'
-            });
+            return res.status(500).json({ error: 'internal_error', message: 'Failed to create payment' });
         }
     });
 
-    /**
-     * GET /api/v1/payments/:payment_id
-     * Get payment status
-     */
     router.get('/:payment_id', async (req, res) => {
         const { payment_id } = req.params;
         const app = req.app;
@@ -76,14 +58,10 @@ function createPaymentRoutes(pool, webhookService) {
             );
 
             if (result.rows.length === 0) {
-                return res.status(404).json({
-                    error: 'not_found',
-                    message: 'Payment not found'
-                });
+                return res.status(404).json({ error: 'not_found', message: 'Payment not found' });
             }
 
             const payment = result.rows[0];
-
             return res.json({
                 payment_id: payment.payment_id,
                 status: payment.status,
@@ -95,113 +73,104 @@ function createPaymentRoutes(pool, webhookService) {
                 completed_at: payment.completed_at,
                 created_at: payment.created_at
             });
-
         } catch (error) {
             console.error('Error fetching payment:', error);
-            return res.status(500).json({
-                error: 'internal_error',
-                message: 'Failed to fetch payment'
+            return res.status(500).json({ error: 'internal_error', message: 'Failed to fetch payment' });
+        }
+    });
+
+    // --- EXTERNAL ENDPOINTS (Matching ZenWallet Integration Guide) ---
+
+    /**
+     * POST /create-request
+     * For use with /api/external prefix
+     */
+    router.post('/create-request', async (req, res) => {
+        const { amount, referenceId, callbackUrl, merchantId } = req.body;
+        const app = req.app;
+
+        if (!amount || !referenceId || !merchantId) {
+            return res.status(400).json({ success: false, message: 'Missing required fields: amount, referenceId, merchantId' });
+        }
+
+        try {
+            const token = generatePaymentId(); // Using this as the checkout token
+            const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+            // Find merchant (destination wallet)
+            const merchantRes = await pool.query('SELECT id FROM wallets WHERE user_id = $1', [merchantId]);
+            if (merchantRes.rows.length === 0) {
+                return res.status(404).json({ success: false, message: 'Merchant not found' });
+            }
+            const merchantWalletId = merchantRes.rows[0].id;
+
+            // Create payment
+            await pool.query(
+                `INSERT INTO payments (payment_id, app_id, amount, reference, to_wallet_id, expires_at, status)
+                 VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')`,
+                [token, app.id, amount, referenceId, merchantWalletId, expiresAt]
+            );
+
+            const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+            // Assuming the frontend checkout UI is hosted on the same server at /pay?token=...
+            const paymentUrl = `${baseUrl}/pay?token=${token}`;
+
+            console.log(`[EXTERNAL] Payment Request: ${token} for Reference: ${referenceId}`);
+
+            return res.json({
+                success: true,
+                data: {
+                    token: token,
+                    paymentUrl: paymentUrl
+                }
             });
+        } catch (error) {
+            console.error('External Payment Error:', error);
+            return res.status(500).json({ success: false, message: 'Internal Server Error' });
         }
     });
 
     /**
-     * POST /api/v1/payments/:payment_id/complete
-     * Mark payment as complete (internal use / admin)
+     * GET /verify-reference
      */
-    router.post('/:payment_id/complete', async (req, res) => {
-        const { payment_id } = req.params;
-        const { transaction_id, from_wallet_id, to_wallet_id } = req.body;
+    router.get('/verify-reference', async (req, res) => {
+        const { merchantId, referenceId } = req.query;
         const app = req.app;
 
-        try {
-            const result = await pool.query(
-                `UPDATE payments 
-                 SET status = 'SUCCESS', 
-                     completed_at = CURRENT_TIMESTAMP,
-                     transaction_id = $1,
-                     from_wallet_id = $2,
-                     to_wallet_id = $3
-                 WHERE payment_id = $4 AND app_id = $5 AND status = 'PENDING'
-                 RETURNING *`,
-                [transaction_id, from_wallet_id, to_wallet_id, payment_id, app.id]
-            );
-
-            if (result.rows.length === 0) {
-                return res.status(404).json({
-                    error: 'not_found',
-                    message: 'Payment not found or already completed'
-                });
-            }
-
-            const payment = result.rows[0];
-
-            // Trigger webhook
-            await webhookService.sendPaymentSuccessWebhook(payment);
-
-            console.log(`[PAYMENT] Completed: ${payment_id}`);
-
-            return res.json({
-                payment_id: payment.payment_id,
-                status: 'SUCCESS',
-                completed_at: payment.completed_at
-            });
-
-        } catch (error) {
-            console.error('Error completing payment:', error);
-            return res.status(500).json({
-                error: 'internal_error',
-                message: 'Failed to complete payment'
-            });
+        if (!merchantId || !referenceId) {
+            return res.status(400).json({ received: false, message: 'Missing merchantId or referenceId' });
         }
-    });
-
-    /**
-     * POST /api/v1/payments/:payment_id/fail
-     * Mark payment as failed
-     */
-    router.post('/:payment_id/fail', async (req, res) => {
-        const { payment_id } = req.params;
-        const { reason } = req.body;
-        const app = req.app;
 
         try {
+            // Find merchant
+            const merchantRes = await pool.query('SELECT id FROM wallets WHERE user_id = $1', [merchantId]);
+            if (merchantRes.rows.length === 0) {
+                return res.json({ received: false, message: 'Merchant not found' });
+            }
+            const merchantWalletId = merchantRes.rows[0].id;
+
+            // Find payment
             const result = await pool.query(
-                `UPDATE payments 
-                 SET status = 'FAILED', 
-                     failure_reason = $1,
-                     completed_at = CURRENT_TIMESTAMP
-                 WHERE payment_id = $2 AND app_id = $3 AND status = 'PENDING'
-                 RETURNING *`,
-                [reason || 'Payment failed', payment_id, app.id]
+                `SELECT status, amount FROM payments 
+                 WHERE reference = $1 AND to_wallet_id = $2 AND app_id = $3
+                 ORDER BY created_at DESC LIMIT 1`,
+                [referenceId, merchantWalletId, app.id]
             );
 
             if (result.rows.length === 0) {
-                return res.status(404).json({
-                    error: 'not_found',
-                    message: 'Payment not found or already completed'
-                });
+                return res.json({ received: false, message: 'Transaction not found for this reference' });
             }
 
             const payment = result.rows[0];
-
-            // Trigger webhook
-            await webhookService.sendPaymentFailedWebhook(payment);
-
-            console.log(`[PAYMENT] Failed: ${payment_id} - ${reason}`);
-
             return res.json({
-                payment_id: payment.payment_id,
-                status: 'FAILED',
-                failure_reason: payment.failure_reason
+                received: payment.status === 'SUCCESS',
+                status: payment.status,
+                amount: parseFloat(payment.amount)
             });
 
         } catch (error) {
-            console.error('Error failing payment:', error);
-            return res.status(500).json({
-                error: 'internal_error',
-                message: 'Failed to mark payment as failed'
-            });
+            console.error('Verify error:', error);
+            return res.status(500).json({ received: false, message: 'Verification error' });
         }
     });
 

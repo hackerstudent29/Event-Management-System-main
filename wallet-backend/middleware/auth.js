@@ -1,23 +1,31 @@
 const { verifyApiKey } = require('../utils/crypto');
 
 /**
- * Middleware: Authenticate API requests using Bearer token
+ * Middleware: Authenticate API requests
+ * Supports both X-API-Key header and Authorization: Bearer
  */
 async function authenticateApiKey(pool) {
     return async (req, res, next) => {
-        const authHeader = req.headers.authorization;
+        // Try both common header names
+        let apiKey = req.headers['x-api-key'] || req.headers['X-API-Key'];
 
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        // If not found, check Authorization header for Bearer token
+        if (!apiKey) {
+            const authHeader = req.headers.authorization;
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                apiKey = authHeader.substring(7);
+            }
+        }
+
+        if (!apiKey) {
             return res.status(401).json({
                 error: 'unauthorized',
-                message: 'Missing or invalid Authorization header'
+                message: 'Missing API Key. Provide it in X-API-Key or Authorization: Bearer header.'
             });
         }
 
-        const apiKey = authHeader.substring(7); // Remove 'Bearer '
-
         try {
-            // Find app with matching API key
+            // Find all active apps
             const result = await pool.query(
                 'SELECT id, app_id, api_key_hash, is_active FROM apps WHERE is_active = true'
             );
@@ -33,9 +41,9 @@ async function authenticateApiKey(pool) {
             }
 
             if (!authenticatedApp) {
-                return res.status(401).json({
-                    error: 'unauthorized',
-                    message: 'Invalid API key'
+                return res.status(403).json({
+                    error: 'forbidden',
+                    message: 'Invalid or inactive API Key'
                 });
             }
 

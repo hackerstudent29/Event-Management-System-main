@@ -29,12 +29,12 @@ services:
       - key: WALLET_WEBHOOK_SECRET
         value: whsec_bc24cea9c3c052796686b6aa5b886109d13f85e09965540b
       - key: WALLET_API_KEY
-        value: sk_test_03abcd094afe7353305ec9fe8dc7907058beb9870e7981e6
+        value: SET_IN_RENDER_DASHBOARD
+      - key: WALLET_MERCHANT_ID
+        value: f294121c-2340-4e91-bf65-b550a6e0d81a
       - key: WALLET_SERVICE_URL
-        fromService:
-          type: web
-          name: wallet-backend
-          property: url
+        value: https://payment-gateway-up7l.onrender.com
+
 
   - type: web
     name: wallet-backend

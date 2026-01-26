@@ -34,6 +34,9 @@ public class PaymentService {
     @Value("${wallet.api.key}")
     private String walletApiKey;
 
+    @Value("${wallet.merchant.id:f294121c-2340-4e91-bf65-b550a6e0d81a}")
+    private String walletMerchantId;
+
     // In-memory storage for pending bookings (ReferenceId -> BookingRequest List)
     private final Map<String, List<Dtos.BookingRequest>> pendingBookings = new ConcurrentHashMap<>();
 
@@ -43,36 +46,45 @@ public class PaymentService {
 
     public Dtos.OrderResponse createOrder(double amount, String currency) throws RazorpayException {
         // [New Payment Gateway Integration]
-        // Instead of Razorpay, we now call our Wallet Payment Gateway create endpoint
+        // Updated to use the correct ZenWallet endpoints as per the integration guide
 
         RestTemplate restTemplate = new RestTemplate();
-        String url = walletServiceUrl + "/api/v1/payments/create";
+        String url = walletServiceUrl + "/api/external/create-request";
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
-        headers.set("Authorization", "Bearer " + walletApiKey);
+        headers.set("X-API-Key", walletApiKey);
 
-        // Map Dtos.OrderRequest (which came from frontend) to Gateway Request
+        // Map Dtos.OrderRequest to Gateway Request
         JSONObject gatewayRequest = new JSONObject();
         gatewayRequest.put("amount", amount);
-        gatewayRequest.put("currency", currency);
-        gatewayRequest.put("reference", "Book-" + System.currentTimeMillis());
+        gatewayRequest.put("merchantId", walletMerchantId);
+        gatewayRequest.put("referenceId", "Book-" + System.currentTimeMillis());
+        // For generic orders, we can't easily set a callback here without more context,
+        // but let's provide a sensible default if it's called.
+        gatewayRequest.put("callbackUrl", "https://zendrumbooking.vercel.app/payment-success");
 
         HttpEntity<String> entity = new HttpEntity<>(gatewayRequest.toString(), headers);
 
         try {
             // Call Gateway
             String responseStr = restTemplate.postForObject(url, entity, String.class);
-            JSONObject response = new JSONObject(responseStr);
+            JSONObject jsonRes = new JSONObject(responseStr);
 
-            // Map Gateway Response back to Dtos.OrderResponse (to keep frontend happy)
-            Dtos.OrderResponse orderResponse = new Dtos.OrderResponse();
-            orderResponse.setId(response.getString("payment_id"));
-            orderResponse.setAmount(response.getInt("amount") * 100);
-            orderResponse.setCurrency(response.getString("currency"));
-            orderResponse.setStatus(response.getString("status"));
-
-            return orderResponse;
+            if (jsonRes.getBoolean("success")) {
+                JSONObject data = jsonRes.getJSONObject("data");
+                Dtos.OrderResponse orderResponse = new Dtos.OrderResponse();
+                orderResponse.setId(data.getString("token")); // Use token as ID
+                orderResponse.setAmount(amount);
+                orderResponse.setCurrency(currency);
+                orderResponse.setStatus("CREATED");
+                // We'd ideally want to return the paymentUrl here, but OrderResponse doesn't
+                // have it.
+                // However, if the old frontend used this, it would expect Razorpay format.
+                return orderResponse;
+            } else {
+                throw new RuntimeException("Gateway creation failed: " + jsonRes.optString("message"));
+            }
 
         } catch (Exception e) {
             System.err.println("Gateway creation failed: " + e.getMessage());
@@ -127,7 +139,7 @@ public class PaymentService {
 
             JSONObject payload = new JSONObject();
             payload.put("amount", request.getAmount());
-            payload.put("merchantId", "f294121c-2340-4e91-bf65-b550a6e0d81a"); // From Guide
+            payload.put("merchantId", walletMerchantId);
             payload.put("referenceId", request.getReference());
             // Callback URL points to Frontend Success Page
             // IMPORTANT: This URL must be accessible by the user's browser.
@@ -137,7 +149,7 @@ public class PaymentService {
 
             HttpHeaders headers = new HttpHeaders();
             headers.set("Content-Type", "application/json");
-            headers.set("x-api-key", walletApiKey);
+            headers.set("X-API-Key", walletApiKey);
 
             HttpEntity<String> entity = new HttpEntity<>(payload.toString(), headers);
 
@@ -170,11 +182,11 @@ public class PaymentService {
             // 1. Verify with ZenWallet
             RestTemplate restTemplate = new RestTemplate();
             String verifyUrl = walletServiceUrl + "/api/external/verify-reference"
-                    + "?merchantId=f294121c-2340-4e91-bf65-b550a6e0d81a"
+                    + "?merchantId=" + walletMerchantId
                     + "&referenceId=" + referenceId;
 
             HttpHeaders headers = new HttpHeaders();
-            headers.set("x-api-key", walletApiKey);
+            headers.set("X-API-Key", walletApiKey);
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
             ResponseEntity<String> res = restTemplate.exchange(verifyUrl, HttpMethod.GET, entity, String.class);
