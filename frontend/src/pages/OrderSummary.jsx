@@ -129,24 +129,36 @@ export default function OrderSummary() {
         try {
             // MERCHANT ID: f294121c-2340-4e91-bf65-b550a6e0d81a
             const merchantId = "f294121c-2340-4e91-bf65-b550a6e0d81a";
+            // Use Payment Gateway API
+            const PAYMENT_GATEWAY_URL = "https://payment-gateway-up7l.onrender.com/api/external";
 
-            // Call Website A Backend to initiate the server-to-server transfer
-            await api.post('/payments/initiate-wallet-transfer', {
-                fromUserId: user.id, // Current logged in user
-                toWalletId: merchantId,
-                amount: totalAmount,
-                reference: referenceId,
-                bookings: bookingPayload // Include booking details to be saved on success
+            const response = await fetch(`${PAYMENT_GATEWAY_URL}/create-request`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': 'default-merchant-key' // In prod, this would be a secure key
+                },
+                body: JSON.stringify({
+                    amount: totalAmount,
+                    referenceId: referenceId,
+                    merchantId: merchantId,
+                    callbackUrl: window.location.origin + '/payment-success?ref=' + referenceId
+                })
             });
 
-            // Note: We don't wait for the response to confirm booking here.
-            // The Socket.IO "payment_update" event will handle the success/failure UI.
+            const resData = await response.json();
 
-            showMessage("Payment request sent. Waiting for confirmation...", { type: 'info' });
+            if (resData.success) {
+                // Redirect to the payment page
+                window.location.href = resData.data.paymentUrl;
+            } else {
+                showMessage("Payment Gateway Error: " + resData.message, { type: 'error' });
+                setIsProcessing(false);
+            }
 
         } catch (err) {
             console.error("Wallet Payment Error:", err);
-            showMessage("Failed to initiate wallet payment.", { type: 'error' });
+            showMessage("Failed to connect to Payment Gateway.", { type: 'error' });
             setIsProcessing(false);
         }
     };

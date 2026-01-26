@@ -17,6 +17,7 @@ import TicketPage from './pages/TicketPage';
 import ScannerPage from './pages/ScannerPage';
 import PublicVerifyPage from './pages/PublicVerifyPage';
 import ZendrumBooking from './pages/ZendrumBooking';
+import PaymentSuccess from './pages/PaymentSuccess';
 
 import { MessageProvider } from './context/MessageContext';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -75,6 +76,7 @@ function App() {
                   <Route path="/order-summary" element={<ProtectedRoute><OrderSummary /></ProtectedRoute>} />
                   <Route path="/ticket/:bookingId" element={<ProtectedRoute><TicketPage /></ProtectedRoute>} />
                   <Route path="/zendrum-booking" element={<ZendrumBooking />} />
+                  <Route path="/payment-success" element={<ProtectedRoute><PaymentSuccess /></ProtectedRoute>} />
                 </Route>
               </Routes>
             </InactivityManager>
