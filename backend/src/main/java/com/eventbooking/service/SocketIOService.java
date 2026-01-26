@@ -11,8 +11,10 @@ public class SocketIOService {
     private SimpMessagingTemplate messagingTemplate;
 
     public void sendPaymentUpdate(String orderId, Object message) {
-        // Broadcast specifically to the topic for this order
-        messagingTemplate.convertAndSend("/topic/payment/" + orderId, message);
-        System.out.println("Sent STOMP update for order: " + orderId);
+        if (message != null) {
+            // Broadcast specifically to the topic for this order
+            messagingTemplate.convertAndSend("/topic/payment/" + orderId, message);
+            System.out.println("Sent STOMP update for order: " + orderId);
+        }
     }
 }

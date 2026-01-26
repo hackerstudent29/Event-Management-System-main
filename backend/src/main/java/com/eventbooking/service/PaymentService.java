@@ -1,7 +1,5 @@
 package com.eventbooking.service;
 
-import com.razorpay.Order;
-import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
 import com.razorpay.Utils;
 import org.json.JSONObject;
@@ -31,20 +29,26 @@ public class PaymentService {
     @Value("${wallet.api.key}")
     private String walletApiKey;
 
-    private RazorpayClient client;
+    // private RazorpayClient client;
 
     @PostConstruct
     public void init() {
-        try {
-            if (keyId != null && !keyId.isEmpty() && !"rzp_test_placeholder".equals(keyId)) {
-                this.client = new RazorpayClient(keyId, keySecret);
-                System.out.println("Razorpay Client initialized successfully.");
-            } else {
-                System.err.println("Razorpay Keys are missing or placeholders. Payment features will be limited.");
-            }
-        } catch (RazorpayException e) {
-            System.err.println("Failed to initialize Razorpay Client: " + e.getMessage());
-        }
+        /*
+         * try {
+         * if (keyId != null && !keyId.isEmpty() &&
+         * !"rzp_test_placeholder".equals(keyId)) {
+         * this.client = new RazorpayClient(keyId, keySecret);
+         * System.out.println("Razorpay Client initialized successfully.");
+         * } else {
+         * System.err.
+         * println("Razorpay Keys are missing or placeholders. Payment features will be limited."
+         * );
+         * }
+         * } catch (RazorpayException e) {
+         * System.err.println("Failed to initialize Razorpay Client: " +
+         * e.getMessage());
+         * }
+         */
     }
 
     public Dtos.OrderResponse createOrder(double amount, String currency) throws RazorpayException {
@@ -100,6 +104,7 @@ public class PaymentService {
         }
     }
 
+    @SuppressWarnings("null")
     public Object verifyWalletPayment(Dtos.WalletVerificationRequest request) {
         RestTemplate restTemplate = new RestTemplate();
         String url = walletServiceUrl + "/api/external/verify-reference";
@@ -162,11 +167,12 @@ public class PaymentService {
             Dtos.WalletTransferResponse transferRes = restTemplate.postForObject(transferUrl, transferEntity,
                     Dtos.WalletTransferResponse.class);
 
-            if (!"SUCCESS".equals(transferRes.getStatus())) {
+            if (transferRes == null || !"SUCCESS".equals(transferRes.getStatus())) {
                 // Mark payment as failed in gateway
+                String reason = (transferRes != null) ? transferRes.getReason() : "No response from transfer service";
                 String failUrl = walletServiceUrl + "/api/v1/payments/" + paymentId + "/fail";
                 JSONObject failReq = new JSONObject();
-                failReq.put("reason", transferRes.getReason());
+                failReq.put("reason", reason);
                 restTemplate.postForObject(failUrl, new HttpEntity<>(failReq.toString(), headers), String.class);
                 return transferRes;
             }

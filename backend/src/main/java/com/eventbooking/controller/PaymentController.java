@@ -2,7 +2,7 @@ package com.eventbooking.controller;
 
 import com.eventbooking.dto.Dtos;
 import com.eventbooking.service.PaymentService;
-import com.razorpay.RazorpayException;
+// import com.razorpay.RazorpayException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
