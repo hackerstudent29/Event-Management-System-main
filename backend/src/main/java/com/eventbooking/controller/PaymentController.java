@@ -19,8 +19,9 @@ public class PaymentController {
         try {
             Dtos.OrderResponse response = paymentService.createOrder(request.getAmount(), request.getCurrency());
             return ResponseEntity.ok(response);
-        } catch (RazorpayException e) {
-            return ResponseEntity.status(500).build();
+        } catch (Exception e) {
+            System.err.println("Error creating order: " + e.getMessage());
+            return ResponseEntity.status(500).header("X-Error-Message", e.getMessage()).build();
         }
     }
 

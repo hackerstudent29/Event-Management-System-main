@@ -31,11 +31,23 @@ public class PaymentService {
     private RazorpayClient client;
 
     @PostConstruct
-    public void init() throws RazorpayException {
-        this.client = new RazorpayClient(keyId, keySecret);
+    public void init() {
+        try {
+            if (keyId != null && !keyId.isEmpty() && !"rzp_test_placeholder".equals(keyId)) {
+                this.client = new RazorpayClient(keyId, keySecret);
+                System.out.println("Razorpay Client initialized successfully.");
+            } else {
+                System.err.println("Razorpay Keys are missing or placeholders. Payment features will be limited.");
+            }
+        } catch (RazorpayException e) {
+            System.err.println("Failed to initialize Razorpay Client: " + e.getMessage());
+        }
     }
 
     public Dtos.OrderResponse createOrder(double amount, String currency) throws RazorpayException {
+        if (this.client == null) {
+            throw new RuntimeException("Razorpay is not configured. Please check your Key ID and Secret.");
+        }
         JSONObject orderRequest = new JSONObject();
         orderRequest.put("amount", (int) (amount * 100)); // amount in the smallest currency unit (paise)
         orderRequest.put("currency", currency);
