@@ -12,7 +12,12 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class PaymentService {
@@ -29,26 +34,11 @@ public class PaymentService {
     @Value("${wallet.api.key}")
     private String walletApiKey;
 
-    // private RazorpayClient client;
+    // In-memory storage for pending bookings (ReferenceId -> BookingRequest List)
+    private final Map<String, List<Dtos.BookingRequest>> pendingBookings = new ConcurrentHashMap<>();
 
     @PostConstruct
     public void init() {
-        /*
-         * try {
-         * if (keyId != null && !keyId.isEmpty() &&
-         * !"rzp_test_placeholder".equals(keyId)) {
-         * this.client = new RazorpayClient(keyId, keySecret);
-         * System.out.println("Razorpay Client initialized successfully.");
-         * } else {
-         * System.err.
-         * println("Razorpay Keys are missing or placeholders. Payment features will be limited."
-         * );
-         * }
-         * } catch (RazorpayException e) {
-         * System.err.println("Failed to initialize Razorpay Client: " +
-         * e.getMessage());
-         * }
-         */
     }
 
     public Dtos.OrderResponse createOrder(double amount, String currency) throws RazorpayException {
@@ -78,8 +68,7 @@ public class PaymentService {
             // Map Gateway Response back to Dtos.OrderResponse (to keep frontend happy)
             Dtos.OrderResponse orderResponse = new Dtos.OrderResponse();
             orderResponse.setId(response.getString("payment_id"));
-            orderResponse.setAmount(response.getInt("amount") * 100); // Back to paise for frontend compatibility? Or
-                                                                      // just keep units consistent.
+            orderResponse.setAmount(response.getInt("amount") * 100);
             orderResponse.setCurrency(response.getString("currency"));
             orderResponse.setStatus(response.getString("status"));
 
@@ -114,7 +103,7 @@ public class PaymentService {
                 .queryParam("referenceId", request.getReferenceId());
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set("x-api-key", "your-api-key");
+        headers.set("x-api-key", walletApiKey);
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
         try {
@@ -124,84 +113,87 @@ public class PaymentService {
         }
     }
 
-    public Dtos.WalletTransferResponse initiateWalletTransfer(Dtos.WalletTransferInitiationRequest request) {
+    public Dtos.WalletTransferResponse initiateWalletTransfer(Dtos.WalletTransferInitiationRequest request,
+            List<Dtos.BookingRequest> bookings) {
         RestTemplate restTemplate = new RestTemplate();
+        Dtos.WalletTransferResponse response = new Dtos.WalletTransferResponse();
 
         try {
-            // STEP 1: Create Payment Intent (Gateway)
-            String createUrl = walletServiceUrl + "/api/v1/payments/create";
+            // Store bookings for later retrieval
+            pendingBookings.put(request.getReference(), bookings);
+
+            // Call ZenWallet to create payment request
+            String createUrl = walletServiceUrl + "/api/external/create-request";
+
+            JSONObject payload = new JSONObject();
+            payload.put("amount", request.getAmount());
+            payload.put("merchantId", "f294121c-2340-4e91-bf65-b550a6e0d81a"); // From Guide
+            payload.put("referenceId", request.getReference());
+            // Callback URL points to Frontend Success Page
+            // IMPORTANT: This URL must be accessible by the user's browser.
+            // Assuming default Vercel deployment structure for now.
+            payload.put("callbackUrl",
+                    "https://zendrumbooking.vercel.app/payment-success?ref=" + request.getReference());
+
             HttpHeaders headers = new HttpHeaders();
             headers.set("Content-Type", "application/json");
-            headers.set("Authorization", "Bearer " + walletApiKey);
+            headers.set("x-api-key", walletApiKey);
 
-            JSONObject createReq = new JSONObject();
-            createReq.put("amount", request.getAmount());
-            createReq.put("currency", "COIN"); // Fixed for now
-            createReq.put("reference", request.getReference());
+            HttpEntity<String> entity = new HttpEntity<>(payload.toString(), headers);
 
-            HttpEntity<String> createEntity = new HttpEntity<>(createReq.toString(), headers);
-            String createResStr = restTemplate.postForObject(createUrl, createEntity, String.class);
-            JSONObject createRes = new JSONObject(createResStr);
-            String paymentId = createRes.getString("payment_id");
+            String responseStr = restTemplate.postForObject(createUrl, entity, String.class);
+            JSONObject jsonRes = new JSONObject(responseStr);
 
-            // STEP 2: Execute Valid Transfer (Legacy Engine)
-            // This actually moves the money. In a real gateway, the user would approve this
-            // via UI.
-            // Since we are simulating, we do it server-to-server.
-            String transferUrl = walletServiceUrl + "/api/wallet/transfer"; // Note: this is the old endpoint
-            // No API key on old endpoint for now (or add it if needed - assuming legacy
-            // works as before)
-            // But we should probably secure it. The old endpoint didn't verify API key!
-            // We'll leave it as is for migration compatibility as user didn't ask to change
-            // legacy auth yet.
-
-            HttpEntity<Dtos.WalletTransferInitiationRequest> transferEntity = new HttpEntity<>(request, headers); // headers
-                                                                                                                  // reused?
-                                                                                                                  // Old
-                                                                                                                  // endpoint
-                                                                                                                  // doesn't
-                                                                                                                  // check
-                                                                                                                  // Bearer,
-                                                                                                                  // so
-                                                                                                                  // safe.
-            Dtos.WalletTransferResponse transferRes = restTemplate.postForObject(transferUrl, transferEntity,
-                    Dtos.WalletTransferResponse.class);
-
-            if (transferRes == null || !"SUCCESS".equals(transferRes.getStatus())) {
-                // Mark payment as failed in gateway
-                String reason = (transferRes != null) ? transferRes.getReason() : "No response from transfer service";
-                String failUrl = walletServiceUrl + "/api/v1/payments/" + paymentId + "/fail";
-                JSONObject failReq = new JSONObject();
-                failReq.put("reason", reason);
-                restTemplate.postForObject(failUrl, new HttpEntity<>(failReq.toString(), headers), String.class);
-                return transferRes;
+            if (jsonRes.getBoolean("success")) {
+                JSONObject data = jsonRes.getJSONObject("data");
+                response.setStatus("REDIRECT");
+                response.setPaymentUrl(data.getString("paymentUrl"));
+                response.setTransactionId(data.getString("token"));
+            } else {
+                response.setStatus("FAILED");
+                response.setReason("Gateway returned false detail");
             }
 
-            // STEP 3: Complete Payment (Gateway) - Triggers Webhook
-            String completeUrl = walletServiceUrl + "/api/v1/payments/" + paymentId + "/complete";
-            JSONObject completeReq = new JSONObject();
-            completeReq.put("transaction_id", transferRes.getTransactionId());
-            completeReq.put("from_wallet_id", request.getFromUserId()); // We don't have wallet ID here easily, passing
-                                                                        // User ID might fail FK if not UUID.
-            // Wait, legacy transfer uses User ID to find Wallet. The response might have
-            // Wallet ID?
-            // Legacy response doesn't return Wallet IDs.
-            // For now, let's pass null for wallet IDs or fetch them.
-            // Actually, the payments table FKs are nullable. We can skip them for now or
-            // fix later.
-            // But 'transaction_id' is important.
-
-            restTemplate.postForObject(completeUrl, new HttpEntity<>(completeReq.toString(), headers), String.class);
-
-            return transferRes;
+            return response;
 
         } catch (Exception e) {
-            System.err.println("Wallet Transfer Orchestration Failed: " + e.getMessage());
+            System.err.println("Wallet Initiation Failed: " + e.getMessage());
             e.printStackTrace();
-            Dtos.WalletTransferResponse failedResponse = new Dtos.WalletTransferResponse();
-            failedResponse.setStatus("FAILED");
-            failedResponse.setReason("GATEWAY_ERROR");
-            return failedResponse;
+            response.setStatus("FAILED");
+            response.setReason("GATEWAY_ERROR: " + e.getMessage());
+            return response;
         }
+    }
+
+    public boolean finalizeWalletPayment(String referenceId) {
+        try {
+            // 1. Verify with ZenWallet
+            RestTemplate restTemplate = new RestTemplate();
+            String verifyUrl = walletServiceUrl + "/api/external/verify-reference"
+                    + "?merchantId=f294121c-2340-4e91-bf65-b550a6e0d81a"
+                    + "&referenceId=" + referenceId;
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-api-key", walletApiKey);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            ResponseEntity<String> res = restTemplate.exchange(verifyUrl, HttpMethod.GET, entity, String.class);
+            JSONObject jsonRes = new JSONObject(res.getBody());
+
+            if (jsonRes.has("received") && jsonRes.getBoolean("received")) {
+                return true;
+            }
+        } catch (Exception e) {
+            System.err.println("Verification Failed: " + e.getMessage());
+        }
+        return false;
+    }
+
+    public List<Dtos.BookingRequest> getPendingBookings(String referenceId) {
+        return pendingBookings.get(referenceId);
+    }
+
+    public void removePendingBooking(String referenceId) {
+        pendingBookings.remove(referenceId);
     }
 }

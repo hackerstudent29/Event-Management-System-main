@@ -46,28 +46,38 @@ public class PaymentController {
     @PostMapping("/initiate-wallet-transfer")
     public ResponseEntity<Dtos.WalletTransferResponse> initiateWalletTransfer(
             @RequestBody Dtos.ProcessWalletPaymentRequest request) {
-        // 1. Prepare initiation request for Wallet Backend
+
+        // 1. Initiate Hosted Payment Session
         Dtos.WalletTransferInitiationRequest walletRequest = new Dtos.WalletTransferInitiationRequest();
         walletRequest.setFromUserId(request.getFromUserId());
-        walletRequest.setToWalletId(request.getToWalletId());
         walletRequest.setAmount(request.getAmount());
         walletRequest.setReference(request.getReference());
 
-        // 2. Call Wallet Backend
-        Dtos.WalletTransferResponse response = paymentService.initiateWalletTransfer(walletRequest);
+        // Pass bookings to service to store them pending
+        Dtos.WalletTransferResponse response = paymentService.initiateWalletTransfer(walletRequest,
+                request.getBookings());
 
-        // 3. If Successful, process bookings in Website A DB
-        if ("SUCCESS".equals(response.getStatus())) {
-            if (request.getBookings() != null) {
-                for (Dtos.BookingRequest br : request.getBookings()) {
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/finalize-wallet")
+    public ResponseEntity<?> finalizeWalletPayment(@RequestBody java.util.Map<String, String> payload) {
+        String referenceId = payload.get("referenceId");
+
+        if (paymentService.finalizeWalletPayment(referenceId)) {
+            // Retrieve pending bookings
+            java.util.List<Dtos.BookingRequest> requests = paymentService.getPendingBookings(referenceId);
+            if (requests != null) {
+                for (Dtos.BookingRequest br : requests) {
                     bookingService.bookSeats(br);
                 }
+                paymentService.removePendingBooking(referenceId);
+                return ResponseEntity.ok(java.util.Collections.singletonMap("success", true));
+            } else {
+                return ResponseEntity.badRequest().body("No pending booking found for this payment reference.");
             }
         }
 
-        // 4. Push real-time update to Frontend
-        socketIOService.sendPaymentUpdate(request.getReference(), response);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.badRequest().body("Payment verification failed.");
     }
 }

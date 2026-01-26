@@ -194,6 +194,7 @@ public class Dtos {
         private String reason;
         private String reference;
         private double amount;
+        private String paymentUrl;
     }
 
     @Data

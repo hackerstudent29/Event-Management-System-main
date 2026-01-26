@@ -18,15 +18,10 @@ export default function PaymentSuccess() {
         const verifyPayment = async () => {
             if (paymentStatus === 'success' && referenceId) {
                 try {
-                    const PAYMENT_GATEWAY_URL = "https://payment-gateway-up7l.onrender.com/api/external";
-                    const MERCHANT_ID = "f294121c-2340-4e91-bf65-b550a6e0d81a";
+                    // Call Backend to finalize and book
+                    const response = await api.post('/payments/finalize-wallet', { referenceId: referenceId });
 
-                    const response = await fetch(`${PAYMENT_GATEWAY_URL}/verify-reference?merchantId=${MERCHANT_ID}&referenceId=${referenceId}`, {
-                        headers: { 'x-api-key': 'default-merchant-key' }
-                    });
-                    const data = await response.json();
-
-                    if (data.received) {
+                    if (response.data.success) {
                         setStatus('success');
                         setMessage('Your payment was successful and your booking is confirmed!');
                     } else {
@@ -36,7 +31,7 @@ export default function PaymentSuccess() {
                 } catch (error) {
                     console.error("Verification error:", error);
                     setStatus('error');
-                    setMessage('Could not verify payment status. Please contact support.');
+                    setMessage(error.response?.data || 'Could not verify payment status. Please contact support.');
                 }
             } else if (paymentStatus === 'success') {
                 // If ref is missing but status says success (legacy/direct link?)

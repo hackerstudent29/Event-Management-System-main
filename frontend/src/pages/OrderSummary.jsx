@@ -127,34 +127,23 @@ export default function OrderSummary() {
         setWalletStatus('verifying');
 
         try {
-            // MERCHANT ID: f294121c-2340-4e91-bf65-b550a6e0d81a
-            const merchantId = "f294121c-2340-4e91-bf65-b550a6e0d81a";
-            // Use Payment Gateway API
-            const PAYMENT_GATEWAY_URL = "https://payment-gateway-up7l.onrender.com/api/external";
-
-            const response = await fetch(`${PAYMENT_GATEWAY_URL}/create-request`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': 'default-merchant-key' // In prod, this would be a secure key
-                },
-                body: JSON.stringify({
-                    amount: totalAmount,
-                    referenceId: referenceId,
-                    merchantId: merchantId,
-                    callbackUrl: window.location.origin + '/payment-success?ref=' + referenceId
-                })
+            // Call Website A Backend to initiate the hosted payment
+            const response = await api.post('/payments/initiate-wallet-transfer', {
+                fromUserId: user.id, // Current logged in user
+                amount: totalAmount,
+                reference: referenceId,
+                bookings: bookingPayload // Include booking details to be saved on success
             });
 
-            const resData = await response.json();
-
-            if (resData.success) {
-                // Redirect to the payment page
-                window.location.href = resData.data.paymentUrl;
+            if (response.data.status === 'REDIRECT' && response.data.paymentUrl) {
+                showMessage("Redirecting to ZenWallet...", { type: 'info' });
+                window.location.href = response.data.paymentUrl;
             } else {
-                showMessage("Payment Gateway Error: " + resData.message, { type: 'error' });
-                setIsProcessing(false);
+                throw new Error(response.data.reason || "Start Payment Failed");
             }
+
+
+
 
         } catch (err) {
             console.error("Wallet Payment Error:", err);
@@ -164,113 +153,8 @@ export default function OrderSummary() {
     };
 
     const handlePayment = async () => {
-        if (paymentMethod === 'wallet') {
-            await handleWalletPayment();
-            return;
-        }
-
-        if (!bookingPayload || bookingPayload.length === 0) {
-            showMessage("Invalid booking data.", { type: 'error' });
-            return;
-        }
-
-        setIsProcessing(true);
-        try {
-            // 1. Create Order on Backend
-            const orderRes = await api.post('/payments/create-order', {
-                amount: totalAmount,
-                currency: "INR"
-            });
-            const orderData = orderRes.data;
-
-            // 2. Load Razorpay Script
-            const loadScript = (src) => {
-                return new Promise((resolve) => {
-                    const script = document.createElement("script");
-                    script.src = src;
-                    script.onload = () => resolve(true);
-                    script.onerror = () => resolve(false);
-                    document.body.appendChild(script);
-                });
-            };
-
-            const res = await loadScript("https://checkout.razorpay.com/v1/checkout.js");
-            if (!res) {
-                showMessage("Razorpay SDK failed to load. Are you online?", { type: 'error' });
-                setIsProcessing(false);
-                return;
-            }
-
-            // 3. Open Razorpay Checkout
-            const options = {
-                key: "rzp_test_placeholder", // This should match backend key or be passed from it
-                amount: orderData.amount,
-                currency: orderData.currency,
-                name: "Event Booking",
-                description: `Payment for ${event.name}`,
-                image: event.imageUrl || "https://example.com/logo.png",
-                order_id: orderData.id,
-                handler: async function (response) {
-                    // This function handles the success response from Razorpay
-                    try {
-                        const verifyRes = await api.post('/payments/verify', {
-                            razorpayOrderId: response.razorpay_order_id,
-                            razorpayPaymentId: response.razorpay_payment_id,
-                            razorpaySignature: response.razorpay_signature
-                        });
-
-                        if (verifyRes.data === true) {
-                            // 4. Confirm Booking on Backend with Payment Details
-                            await Promise.all(
-                                bookingPayload.map(payload => api.post('/bookings', {
-                                    ...payload,
-                                    paymentId: response.razorpay_payment_id,
-                                    razorpayOrderId: response.razorpay_order_id
-                                }))
-                            );
-
-                            setBookingConfirmed(true);
-                            setIsProcessing(false);
-                            showMessage("Booking & Payment Successful!", { type: 'success' });
-                        } else {
-                            showMessage("Payment verification failed.", { type: 'error' });
-                            setIsProcessing(false);
-                        }
-                    } catch (err) {
-                        console.error("Verification error", err);
-                        showMessage("Error verifying payment.", { type: 'error' });
-                        setIsProcessing(false);
-                    }
-                },
-                prefill: {
-                    name: user?.name || "Customer",
-                    email: user?.email || "",
-                    contact: ""
-                },
-                notes: {
-                    address: "Event Booking Office"
-                },
-                theme: {
-                    color: "#0f172a"
-                },
-                modal: {
-                    ondismiss: function () {
-                        setIsProcessing(false);
-                    }
-                }
-            };
-
-            const rzp1 = new window.Razorpay(options);
-            rzp1.open();
-
-        } catch (error) {
-            console.error("Booking Error:", error);
-            setIsProcessing(false);
-            const responseData = error.response?.data;
-            const errorMsg = (typeof responseData === 'string' ? responseData : responseData?.message) ||
-                error.message || "Network error. Please try again.";
-            showMessage("Payment Initialization Failed: " + errorMsg, { type: 'error' });
-        }
+        // Redirect ALL payment methods to ZenWallet Gateway
+        await handleWalletPayment();
     };
 
     if (bookingConfirmed) {
@@ -548,7 +432,7 @@ export default function OrderSummary() {
                                 ) : (
                                     <>
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                                        {paymentMethod === 'wallet' ? 'Confirm Payment Received' : `Pay ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalAmount)}`}
+                                        Proceed to ZenWallet
                                     </>
                                 )}
                             </Button>
