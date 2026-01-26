@@ -28,3 +28,7 @@ services:
         sync: false
       - key: WALLET_SERVICE_URL
         value: https://wallet-service-placeholder.onrender.com
+      - key: WALLET_API_KEY
+        value: sk_test_03abcd094afe7353305ec9fe8dc7907058beb9870e7981e6
+      - key: WALLET_WEBHOOK_SECRET
+        value: whsec_bc24cea9c3c052796686b6aa5b886109d13f85e09965540b

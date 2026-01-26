@@ -190,3 +190,25 @@ io.on('connection', (socket) => {
 
 // Export io to be used in routes if needed (e.g. notify balance change)
 app.set('socketio', io);
+
+// ============================================
+// PAYMENT GATEWAY API (v1)
+// ============================================
+
+const { authenticateApiKey, logApiRequest } = require('./middleware/auth');
+const createPaymentRoutes = require('./routes/payments');
+const WebhookService = require('./services/webhook');
+
+// Initialize webhook service
+const webhookService = new WebhookService(pool);
+webhookService.startRetryWorker(); // Start background retry worker
+
+// Payment Gateway API v1
+const paymentRouter = createPaymentRoutes(pool, webhookService);
+app.use('/api/v1/payments', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+
+console.log('[API] Payment Gateway v1 endpoints registered');
+console.log('  POST /api/v1/payments/create');
+console.log('  GET  /api/v1/payments/:payment_id');
+console.log('  POST /api/v1/payments/:payment_id/complete');
+console.log('  POST /api/v1/payments/:payment_id/fail');

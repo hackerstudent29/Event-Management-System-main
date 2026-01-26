@@ -192,6 +192,8 @@ public class Dtos {
         private String status; // SUCCESS, FAILED
         private String transactionId;
         private String reason;
+        private String reference;
+        private double amount;
     }
 
     @Data

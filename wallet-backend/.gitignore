@@ -1,2 +1,6 @@
 node_modules/
 .env
+secrets.json
+api_key_output.txt
+generate-secrets.js
+generate-api-key.js
