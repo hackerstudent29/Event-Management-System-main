@@ -9,10 +9,12 @@ D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\servic
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\model\SeatHold.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\EventRepository.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\controller\MaintenanceController.java
+D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\SocketIOService.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\config\SchemaFixer.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\security\JwtUtil.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\controller\UserController.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\repository\SeatHoldRepository.java
+D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\config\SocketIOConfig.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\model\UserPreferences.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\service\EventService.java
 D:\.gemini\Event Management System\backend\src\main\java\com\eventbooking\model\EmailOtp.java

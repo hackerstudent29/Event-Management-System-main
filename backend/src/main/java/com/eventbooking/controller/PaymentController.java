@@ -35,4 +35,38 @@ public class PaymentController {
         Object response = paymentService.verifyWalletPayment(request);
         return ResponseEntity.ok(response);
     }
+
+    @Autowired
+    private com.eventbooking.service.SocketIOService socketIOService;
+
+    @Autowired
+    private com.eventbooking.service.BookingService bookingService;
+
+    @PostMapping("/initiate-wallet-transfer")
+    public ResponseEntity<Dtos.WalletTransferResponse> initiateWalletTransfer(
+            @RequestBody Dtos.ProcessWalletPaymentRequest request) {
+        // 1. Prepare initiation request for Wallet Backend
+        Dtos.WalletTransferInitiationRequest walletRequest = new Dtos.WalletTransferInitiationRequest();
+        walletRequest.setFromUserId(request.getFromUserId());
+        walletRequest.setToWalletId(request.getToWalletId());
+        walletRequest.setAmount(request.getAmount());
+        walletRequest.setReference(request.getReference());
+
+        // 2. Call Wallet Backend
+        Dtos.WalletTransferResponse response = paymentService.initiateWalletTransfer(walletRequest);
+
+        // 3. If Successful, process bookings in Website A DB
+        if ("SUCCESS".equals(response.getStatus())) {
+            if (request.getBookings() != null) {
+                for (Dtos.BookingRequest br : request.getBookings()) {
+                    bookingService.bookSeats(br);
+                }
+            }
+        }
+
+        // 4. Push real-time update to Frontend
+        socketIOService.sendPaymentUpdate(request.getReference(), response);
+
+        return ResponseEntity.ok(response);
+    }
 }

@@ -178,4 +178,28 @@ public class Dtos {
         private String merchantId;
         private String referenceId;
     }
+
+    @Data
+    public static class WalletTransferInitiationRequest {
+        private UUID fromUserId;
+        private UUID toWalletId;
+        private double amount;
+        private String reference;
+    }
+
+    @Data
+    public static class WalletTransferResponse {
+        private String status; // SUCCESS, FAILED
+        private String transactionId;
+        private String reason;
+    }
+
+    @Data
+    public static class ProcessWalletPaymentRequest {
+        private UUID fromUserId;
+        private UUID toWalletId;
+        private double amount;
+        private String reference;
+        private java.util.List<BookingRequest> bookings;
+    }
 }

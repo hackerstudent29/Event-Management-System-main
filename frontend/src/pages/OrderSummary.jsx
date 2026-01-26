@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { io } from "socket.io-client";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CreditCard, MapPin, Ticket, ChevronLeft, Calendar as CalendarIcon, Clock } from "lucide-react";
@@ -77,49 +78,64 @@ export default function OrderSummary() {
     const gstAmount = Number((convenienceFee * 0.18).toFixed(2));
     const totalAmount = ticketPrice + convenienceFee + gstAmount;
 
-    const verifyWalletPayment = async () => {
-        setIsProcessing(true);
-        setWalletStatus('verifying');
-        try {
-            // MERCHANT ID from prompt: f294121c-2340-4e91-bf65-b550a6e0d81a
-            const merchantId = "f294121c-2340-4e91-bf65-b550a6e0d81a";
+    const [socket, setSocket] = useState(null);
 
-            // Calling our own backend proxy instead of external URL directly
-            const res = await api.post('/api/payments/verify-wallet', {
-                merchantId,
-                referenceId
-            });
+    React.useEffect(() => {
+        // Initialize Socket.IO connection
+        const newSocket = io("http://localhost:8085");
+        setSocket(newSocket);
 
-            const data = res.data;
+        newSocket.on("connect", () => {
+            console.log("Connected to Payment Socket");
+            newSocket.emit("join_order", referenceId);
+        });
 
-            if (data.received) {
-                showMessage("Payment Received by Wallet App!", { type: 'success' });
-
-                // Confirm Booking on Backend with Wallet Details
-                await Promise.all(
-                    bookingPayload.map(payload => api.post('/api/bookings', {
-                        ...payload,
-                        paymentId: data.details.id,
-                        status: 'CONFIRMED'
-                    }))
-                );
-
+        newSocket.on("payment_update", (data) => {
+            console.log("Received Payment Update:", data);
+            if (data.status === 'SUCCESS') {
+                showMessage("Payment Successful (via Real-time)!", { type: 'success' });
                 setBookingConfirmed(true);
             } else {
-                showMessage(data.message || "No matching transaction found.", { type: 'error' });
+                showMessage(data.reason || "Payment Failed.", { type: 'error' });
             }
-        } catch (err) {
-            console.error("Wallet Verification Error:", err);
-            showMessage("Could not connect to Wallet App. Ensure it is running on port 5000.", { type: 'error' });
-        } finally {
             setIsProcessing(false);
-            setWalletStatus('idle');
+        });
+
+        return () => newSocket.close();
+    }, [referenceId]);
+
+    const handleWalletPayment = async () => {
+        setIsProcessing(true);
+        setWalletStatus('verifying');
+
+        try {
+            // MERCHANT ID: f294121c-2340-4e91-bf65-b550a6e0d81a
+            const merchantId = "f294121c-2340-4e91-bf65-b550a6e0d81a";
+
+            // Call Website A Backend to initiate the server-to-server transfer
+            await api.post('/api/payments/initiate-wallet-transfer', {
+                fromUserId: user.id, // Current logged in user
+                toWalletId: merchantId,
+                amount: totalAmount,
+                reference: referenceId,
+                bookings: bookingPayload // Include booking details to be saved on success
+            });
+
+            // Note: We don't wait for the response to confirm booking here.
+            // The Socket.IO "payment_update" event will handle the success/failure UI.
+
+            showMessage("Payment request sent. Waiting for confirmation...", { type: 'info' });
+
+        } catch (err) {
+            console.error("Wallet Payment Error:", err);
+            showMessage("Failed to initiate wallet payment.", { type: 'error' });
+            setIsProcessing(false);
         }
     };
 
     const handlePayment = async () => {
         if (paymentMethod === 'wallet') {
-            await verifyWalletPayment();
+            await handleWalletPayment();
             return;
         }
 

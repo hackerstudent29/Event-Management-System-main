@@ -80,4 +80,25 @@ public class PaymentService {
             return "{\"received\": false, \"message\": \"External Wallet Service Error\"}";
         }
     }
+
+    public Dtos.WalletTransferResponse initiateWalletTransfer(Dtos.WalletTransferInitiationRequest request) {
+        RestTemplate restTemplate = new RestTemplate();
+        String url = "http://localhost:5000/api/wallet/transfer";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Content-Type", "application/json");
+        // In a real app, add API Key or JWT authentication here
+        // headers.set("Authorization", "Bearer " + walletApiKey);
+
+        HttpEntity<Dtos.WalletTransferInitiationRequest> entity = new HttpEntity<>(request, headers);
+
+        try {
+            return restTemplate.postForObject(url, entity, Dtos.WalletTransferResponse.class);
+        } catch (Exception e) {
+            Dtos.WalletTransferResponse failedResponse = new Dtos.WalletTransferResponse();
+            failedResponse.setStatus("FAILED");
+            failedResponse.setReason("WALLET_SERVICE_UNAVAILABLE");
+            return failedResponse;
+        }
+    }
 }
