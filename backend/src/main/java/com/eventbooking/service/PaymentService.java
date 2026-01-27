@@ -153,7 +153,24 @@ public class PaymentService {
 
             HttpEntity<String> entity = new HttpEntity<>(payload.toString(), headers);
 
-            String responseStr = restTemplate.postForObject(createUrl, entity, String.class);
+            String responseStr = null;
+            int maxRetries = 3;
+            for (int i = 0; i < maxRetries; i++) {
+                try {
+                    responseStr = restTemplate.postForObject(createUrl, entity, String.class);
+                    break; // Success
+                } catch (Exception ex) {
+                    if (i == maxRetries - 1)
+                        throw ex; // Re-throw on last attempt
+                    System.err.println("Wallet Request Failed (Attempt " + (i + 1) + "): " + ex.getMessage());
+                    try {
+                        Thread.sleep(1000 * (i + 1)); // Backoff: 1s, 2s
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+
             JSONObject jsonRes = new JSONObject(responseStr);
 
             if (jsonRes.getBoolean("success")) {
