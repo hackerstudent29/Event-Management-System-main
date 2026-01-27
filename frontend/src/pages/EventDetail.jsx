@@ -487,6 +487,10 @@ const EventDetail = () => {
     }, []);
 
     // Compute occupied seats list
+    // Compute occupied seats list
+    const layoutVariant = event?.seatingLayoutVariant;
+    const eventType = event?.eventType;
+
     const occupiedSeatIds = useMemo(() => {
         // Only include generated gaps if we are in the basic Grid mode, not the visual SVG maps
         const useVisuals = layoutVariant && !['Simple', 'Grid', 'Default'].includes(layoutVariant);
