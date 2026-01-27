@@ -324,8 +324,8 @@ const EventDetail = () => {
                                 rowSeats.push({
                                     id: fullId,
                                     number: c,
-                                    status: isGapRow ? 'occupied' : 'available',
-                                    isGap: isGapRow // Helper for UI
+                                    status: 'available', // Let 'isGap' handle the visual state, don't force 'occupied'
+                                    isGap: isGapRow
                                 });
 
                                 if (isGapRow) collectedGapIds.push(fullId);
@@ -488,9 +488,14 @@ const EventDetail = () => {
 
     // Compute occupied seats list
     const occupiedSeatIds = useMemo(() => {
-        // COMBINED: Actual bookings + Generated gaps for visual blocking on SVG
-        return [...occupiedSeatIdsFromServer, ...gapSeatIds];
-    }, [occupiedSeatIdsFromServer, gapSeatIds]);
+        // Only include generated gaps if we are in the basic Grid mode, not the visual SVG maps
+        const useVisuals = layoutVariant && !['Simple', 'Grid', 'Default'].includes(layoutVariant);
+        const isTheatreGrid = eventType === 'Theatre' && !useVisuals;
+
+        return isTheatreGrid
+            ? [...occupiedSeatIdsFromServer, ...gapSeatIds]
+            : occupiedSeatIdsFromServer;
+    }, [occupiedSeatIdsFromServer, gapSeatIds, layoutVariant, eventType]);
 
 
     if (loading) return <div className="flex justify-center items-center min-h-screen text-slate-400 font-medium">Loading event...</div>;

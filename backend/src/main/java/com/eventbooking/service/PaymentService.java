@@ -177,6 +177,7 @@ public class PaymentService {
         }
     }
 
+    @SuppressWarnings("null")
     public boolean finalizeWalletPayment(String referenceId) {
         try {
             // 1. Verify with ZenWallet

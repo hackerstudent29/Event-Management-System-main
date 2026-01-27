@@ -38,26 +38,35 @@ public class PaymentController {
     }
 
     @Autowired
-    private com.eventbooking.service.SocketIOService socketIOService;
-
-    @Autowired
     private com.eventbooking.service.BookingService bookingService;
 
     @PostMapping("/initiate-wallet-transfer")
     public ResponseEntity<Dtos.WalletTransferResponse> initiateWalletTransfer(
             @RequestBody Dtos.ProcessWalletPaymentRequest request) {
 
-        // 1. Initiate Hosted Payment Session
-        Dtos.WalletTransferInitiationRequest walletRequest = new Dtos.WalletTransferInitiationRequest();
-        walletRequest.setFromUserId(request.getFromUserId());
-        walletRequest.setAmount(request.getAmount());
-        walletRequest.setReference(request.getReference());
+        try {
+            // 1. Initiate Hosted Payment Session
+            Dtos.WalletTransferInitiationRequest walletRequest = new Dtos.WalletTransferInitiationRequest();
+            walletRequest.setFromUserId(request.getFromUserId());
+            walletRequest.setAmount(request.getAmount());
+            walletRequest.setReference(request.getReference());
 
-        // Pass bookings to service to store them pending
-        Dtos.WalletTransferResponse response = paymentService.initiateWalletTransfer(walletRequest,
-                request.getBookings());
+            // Pass bookings to service to store them pending
+            Dtos.WalletTransferResponse response = paymentService.initiateWalletTransfer(walletRequest,
+                    request.getBookings());
 
-        return ResponseEntity.ok(response);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.err.println("Error initiating wallet transfer: " + e.getMessage());
+            Dtos.WalletTransferResponse errorResponse = new Dtos.WalletTransferResponse();
+            errorResponse.setStatus("FAILED");
+            errorResponse.setReason("INTERNAL_ERROR: " + e.toString());
+            // Return 200 so frontend can handle it gracefully, or 500?
+            // Frontend expects status='REDIRECT' or error.
+            // Let's return 200 with FAILED status DTO.
+            return ResponseEntity.ok(errorResponse);
+        }
     }
 
     @PostMapping("/finalize-wallet")

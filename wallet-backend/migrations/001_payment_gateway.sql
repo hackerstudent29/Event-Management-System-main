@@ -127,7 +127,7 @@ INSERT INTO apps (name, app_id, api_key_hash, webhook_url, webhook_secret, envir
 VALUES (
     'Event Booking System',
     'app_eventbook_001',
-    '$2b$10$ccyEpXuNCqqAKICQpFrcZ.RwHEGOZpfdyFMySe66o8wyam3LyPoF.', -- Generated from setup
+    '$2b$10$Mv452m/LGWV9CqrsQdgqIuM.i/ShWevi4pBGjVH3MCww5B5TGxxeGa', -- Generated from setup
     'https://zendrum-backend.onrender.com/api/payments/webhook-callback',
     'whsec_' || gen_random_uuid()::text,
     'sandbox'
