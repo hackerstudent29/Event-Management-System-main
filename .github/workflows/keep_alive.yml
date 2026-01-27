@@ -1,0 +1,26 @@
+name: Keep Alive Services
+
+on:
+  schedule:
+    # Run every 14 minutes to prevent Render free tier from sleeping (sleeps after 15m inactivity)
+    - cron: '*/14 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping_services:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Backend
+        run: |
+          curl -I https://zendrum-backend.onrender.com/api/bookings/ping || echo "Backend Ping Failed"
+
+      - name: Ping Wallet Service
+        run: |
+          curl -I https://payment-gateway-up7l.onrender.com/health || echo "Wallet Ping Failed"
+
+      - name: Ping Frontend
+        run: |
+          curl -I https://zendrumbooking.vercel.app || echo "Frontend Ping Failed"
+
+      - name: Log Timestamp
+        run: echo "Ping completed at $(date)"
