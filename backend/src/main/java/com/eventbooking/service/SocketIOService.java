@@ -12,9 +12,14 @@ public class SocketIOService {
 
     public void sendPaymentUpdate(String orderId, Object message) {
         if (message != null) {
-            // Broadcast specifically to the topic for this order
-            messagingTemplate.convertAndSend("/topic/payment/" + orderId, message);
-            System.out.println("Sent STOMP update for order: " + orderId);
+            try {
+                // Broadcast specifically to the topic for this order
+                messagingTemplate.convertAndSend("/topic/payment/" + orderId, message);
+                System.out.println("Sent STOMP update for order: " + orderId);
+            } catch (Exception e) {
+                System.err.println("Failed to send STOMP update: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     }
 }

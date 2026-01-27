@@ -45,6 +45,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return true;
         }
 
+        // Allow websocket handshake
+        if (path.startsWith("/ws-payment")) {
+            return true;
+        }
+
         return false;
     }
 
