@@ -13,7 +13,7 @@ services:
       - key: SPRING_DATASOURCE_USERNAME
         value: postgres
       - key: SPRING_DATASOURCE_PASSWORD
-        sync: false
+        value: RAMAZENDRUM
       - key: SPRING_JPA_HIBERNATE_DDL_AUTO
         value: update
       - key: APP_CORS_ALLOWED_ORIGINS
@@ -51,7 +51,7 @@ services:
       - key: DB_USER
         value: postgres
       - key: DB_PASSWORD
-        sync: false
+        value: RAMAZENDRUM
       - key: DB_NAME
         value: postgres
       - key: DB_PORT
