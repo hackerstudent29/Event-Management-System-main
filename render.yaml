@@ -9,9 +9,9 @@ services:
     startCommand: cd backend && java -Dserver.port=$PORT -jar target/EventBookingBackend-0.0.1-SNAPSHOT.jar
     envVars:
       - key: SPRING_DATASOURCE_URL
-        value: jdbc:postgresql://db.dlpxciimpvqugavnitne.supabase.co:5432/postgres?sslmode=require
+        value: jdbc:postgresql://aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require
       - key: SPRING_DATASOURCE_USERNAME
-        value: postgres
+        value: postgres.dlpxciimpvqugavnitne
       - key: SPRING_DATASOURCE_PASSWORD
         value: RAMAZENDRUM
       - key: SPRING_JPA_HIBERNATE_DDL_AUTO
@@ -47,9 +47,9 @@ services:
     startCommand: cd wallet-backend && npm start
     envVars:
       - key: DB_HOST
-        value: db.dlpxciimpvqugavnitne.supabase.co
+        value: aws-0-ap-south-1.pooler.supabase.com
       - key: DB_USER
-        value: postgres
+        value: postgres.dlpxciimpvqugavnitne
       - key: DB_PASSWORD
         value: RAMAZENDRUM
       - key: DB_NAME
