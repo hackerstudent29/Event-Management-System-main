@@ -113,9 +113,13 @@ public class AuthController {
                                         user.getEmail(), user.getRole()));
                 } catch (Exception e) {
                         System.out.println("LOGIN FAILED EXCEPTION: " + e.getMessage());
-                        // Return JSON object so frontend can read the message
-                        return ResponseEntity.status(401)
-                                        .body(java.util.Map.of("message", "Login Failed: " + e.getMessage()));
+                        String msg = e.getMessage();
+                        if (msg != null && msg.contains("Invalid credentials")) {
+                                return ResponseEntity.status(401).body(java.util.Map.of("message", msg));
+                        }
+                        // For connection issues like "Could not open JPA EntityManager", return 500
+                        return ResponseEntity.status(500)
+                                        .body(java.util.Map.of("message", "Internal Server Error: " + msg));
                 }
         }
 
