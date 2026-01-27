@@ -4,6 +4,34 @@ const { verifyApiKey } = require('../utils/crypto');
  * Middleware: Authenticate API requests
  * Supports both X-API-Key header and Authorization: Bearer
  */
+// Simple in-memory cache for active apps
+let appCache = null;
+let lastCacheTime = 0;
+const CACHE_TTL = 60000; // 60 seconds
+
+async function getActiveApps(pool) {
+    const now = Date.now();
+    if (appCache && (now - lastCacheTime < CACHE_TTL)) {
+        return appCache;
+    }
+
+    try {
+        const result = await pool.query(
+            'SELECT id, app_id, api_key_hash, is_active FROM apps WHERE is_active = true'
+        );
+        appCache = result.rows;
+        lastCacheTime = now;
+        return appCache;
+    } catch (err) {
+        console.error("Error refreshing app cache:", err);
+        return appCache || []; // Return stale cache if available, else empty
+    }
+}
+
+/**
+ * Middleware: Authenticate API requests
+ * Supports both X-API-Key header and Authorization: Bearer
+ */
 async function authenticateApiKey(pool) {
     return async (req, res, next) => {
         // Try both common header names
@@ -25,14 +53,11 @@ async function authenticateApiKey(pool) {
         }
 
         try {
-            // Find all active apps
-            const result = await pool.query(
-                'SELECT id, app_id, api_key_hash, is_active FROM apps WHERE is_active = true'
-            );
-
+            // Get apps from cache (or DB)
+            const apps = await getActiveApps(pool);
             let authenticatedApp = null;
 
-            for (const app of result.rows) {
+            for (const app of apps) {
                 const isValid = await verifyApiKey(apiKey, app.api_key_hash);
                 if (isValid) {
                     authenticatedApp = app;
