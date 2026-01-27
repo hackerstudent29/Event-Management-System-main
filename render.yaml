@@ -9,7 +9,7 @@ services:
     startCommand: cd backend && java -Dserver.port=$PORT -jar target/EventBookingBackend-0.0.1-SNAPSHOT.jar
     envVars:
       - key: SPRING_DATASOURCE_URL
-        value: jdbc:postgresql://db.dlpxciimpvqugavnitne.supabase.co:5432/postgres
+        value: jdbc:postgresql://db.dlpxciimpvqugavnitne.supabase.co:5432/postgres?sslmode=require
       - key: SPRING_DATASOURCE_USERNAME
         value: postgres
       - key: SPRING_DATASOURCE_PASSWORD

@@ -18,7 +18,8 @@ const pool = new Pool({
     password: process.env.DB_PASSWORD || 'password',
     database: process.env.DB_NAME || 'event_booking',
     port: process.env.DB_PORT || 5432,
-    connectionString: process.env.DATABASE_URL // Prefer connectionString if provided
+    connectionString: process.env.DATABASE_URL, // Prefer connectionString if provided
+    ssl: { rejectUnauthorized: false } // Required for Supabase Direct Connection
 });
 
 pool.on('error', (err, client) => {
