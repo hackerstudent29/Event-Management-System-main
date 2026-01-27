@@ -35,7 +35,7 @@ services:
       - key: WALLET_SERVICE_URL
         value: https://payment-gateway-up7l.onrender.com
       - key: JAVA_TOOL_OPTIONS
-        value: -Xmx350m -Xss512k -XX:CICompilerCount=2 -Dfile.encoding=UTF-8
+        value: -Xmx350m -Xss512k -XX:CICompilerCount=2 -XX:+UseParallelGC -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8
 
 
   - type: web
