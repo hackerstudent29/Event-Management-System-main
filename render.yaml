@@ -6,7 +6,7 @@ services:
     region: singapore
     plan: free
     buildCommand: cd backend && mvn clean package -DskipTests
-    startCommand: cd backend && java -Dserver.port=$PORT -jar target/EventBookingBackend-0.0.1-SNAPSHOT.jar
+    startCommand: cd backend && java -Dserver.port=$PORT -jar target/EventBookingBackend.jar
     envVars:
       - key: SPRING_DATASOURCE_URL
         value: jdbc:postgresql://aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&prepareThreshold=0
