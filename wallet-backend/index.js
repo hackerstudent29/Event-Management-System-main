@@ -153,7 +153,15 @@ app.get('/api/wallet/balance/:userId', async (req, res) => {
  * Health Check
  */
 app.get('/health', (req, res) => {
-    res.json({ status: 'OK', service: 'Wallet App Backend', version: '1.0.1-bulletproof' });
+    res.json({ status: 'OK', service: 'Wallet App Backend', version: '1.0.2-BOMBPROOF' });
+});
+
+app.get('/', (req, res) => {
+    res.json({
+        message: 'ZenWallet API is running... (UPDATED)',
+        timestamp: new Date().toISOString(),
+        version: '1.0.2-BOMBPROOF'
+    });
 });
 
 // --- GO LIVE ---
