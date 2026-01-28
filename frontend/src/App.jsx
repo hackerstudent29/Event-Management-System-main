@@ -6,22 +6,24 @@ import { MessageProvider } from './context/MessageContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import InactivityManager from './components/InactivityManager';
 
-// Lazy load pages for performance
-const Login = React.lazy(() => import('./pages/Login'));
-const Register = React.lazy(() => import('./pages/Register'));
-const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
-const VerifySignupOtp = React.lazy(() => import('./pages/VerifySignupOtp'));
-const EventList = React.lazy(() => import('./pages/EventList'));
-const EventDetail = React.lazy(() => import('./pages/EventDetail'));
-const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
-const MyBookings = React.lazy(() => import('./pages/MyBookings'));
-const Profile = React.lazy(() => import('./pages/Profile'));
-const OrderSummary = React.lazy(() => import('./pages/OrderSummary'));
-const TicketPage = React.lazy(() => import('./pages/TicketPage'));
-const ScannerPage = React.lazy(() => import('./pages/ScannerPage'));
-const PublicVerifyPage = React.lazy(() => import('./pages/PublicVerifyPage'));
-const ZendrumBooking = React.lazy(() => import('./pages/ZendrumBooking'));
-const PaymentSuccess = React.lazy(() => import('./pages/PaymentSuccess'));
+import { lazyRetry } from './utils/lazyRetry';
+
+// Lazy load pages for performance with retry logic
+const Login = lazyRetry(() => import('./pages/Login'));
+const Register = lazyRetry(() => import('./pages/Register'));
+const ForgotPassword = lazyRetry(() => import('./pages/ForgotPassword'));
+const VerifySignupOtp = lazyRetry(() => import('./pages/VerifySignupOtp'));
+const EventList = lazyRetry(() => import('./pages/EventList'));
+const EventDetail = lazyRetry(() => import('./pages/EventDetail'));
+const AdminDashboard = lazyRetry(() => import('./pages/AdminDashboard'));
+const MyBookings = lazyRetry(() => import('./pages/MyBookings'));
+const Profile = lazyRetry(() => import('./pages/Profile'));
+const OrderSummary = lazyRetry(() => import('./pages/OrderSummary'));
+const TicketPage = lazyRetry(() => import('./pages/TicketPage'));
+const ScannerPage = lazyRetry(() => import('./pages/ScannerPage'));
+const PublicVerifyPage = lazyRetry(() => import('./pages/PublicVerifyPage'));
+const ZendrumBooking = lazyRetry(() => import('./pages/ZendrumBooking'));
+const PaymentSuccess = lazyRetry(() => import('./pages/PaymentSuccess'));
 
 const ProtectedRoute = ({ children, role, allowEmail }) => {
   const { user, loading } = useAuth();
