@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["java", "maven"]
+
+[phases.build]
+cmds = ["cd backend && mvn clean package -DskipTests"]
+
+[start]
+cmd = "java -Dserver.port=$PORT -jar backend/target/EventBookingBackend.jar"
