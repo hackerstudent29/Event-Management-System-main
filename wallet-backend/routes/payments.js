@@ -121,10 +121,11 @@ function createPaymentRoutes(pool, webhookService) {
                 [token, app.id, amount, referenceId, merchantWalletId, expiresAt]
             );
 
-            const baseUrl = process.env.PUBLIC_URL || 'https://payment-gateway-production-2f82.up.railway.app';
+            const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || 'https://payment-gateway-production-2f82.up.railway.app';
             const paymentUrl = `${baseUrl}/pay?token=${token}`;
 
             console.log(`[GATEWAY] Created Payment ${token} for Merchant ${merchantId}`);
+            console.log(`[GATEWAY] Payment URL: ${paymentUrl}`);
 
             return res.json({
                 success: true,
