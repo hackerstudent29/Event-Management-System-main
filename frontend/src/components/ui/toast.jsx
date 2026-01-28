@@ -9,6 +9,11 @@ export const ToastProvider = ({ children }) => {
     const [toasts, setToasts] = useState([]);
 
     const showToast = (message, type = 'info', duration = 3000) => {
+        // Simple de-duplication: don't show the exact same message if it's already visible
+        if (toasts.some(t => t.message === message && t.type === type)) {
+            return;
+        }
+
         const id = Math.random().toString(36).substr(2, 9);
         setToasts((prev) => [...prev, { id, message, type }]);
         if (duration > 0) {

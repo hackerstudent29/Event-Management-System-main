@@ -153,7 +153,7 @@ app.get('/api/wallet/balance/:userId', async (req, res) => {
  * Health Check
  */
 app.get('/health', (req, res) => {
-    res.json({ status: 'OK', service: 'Wallet App Backend' });
+    res.json({ status: 'OK', service: 'Wallet App Backend', version: '1.0.1-bulletproof' });
 });
 
 // --- GO LIVE ---

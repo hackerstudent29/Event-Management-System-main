@@ -25,10 +25,14 @@ export default function OrderSummary() {
     const { showMessage } = useMessage();
     const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
 
+    const hasExpired = React.useRef(false);
     React.useEffect(() => {
         if (timeLeft <= 0) {
-            showMessage("Session expired. Your seat hold has been released.", { type: 'error' });
-            navigate('/');
+            if (!hasExpired.current) {
+                hasExpired.current = true;
+                showMessage("Session expired. Your seat hold has been released.", { type: 'error' });
+                navigate('/');
+            }
             return;
         }
 

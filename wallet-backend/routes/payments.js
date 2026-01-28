@@ -97,33 +97,31 @@ function createPaymentRoutes(pool, webhookService) {
             const token = generatePaymentId(); // Using this as the checkout token
             const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
-            // Find merchant (destination wallet)
-            let merchantRes = await pool.query('SELECT id FROM wallets WHERE user_id = $1', [merchantId]);
-            let merchantWalletId;
+            // Atomic Upsert for Merchant Wallet (Robust strategy)
+            console.log(`[INIT] Processing payment for Merchant: ${merchantId}`);
+            const merchantRes = await pool.query(
+                `INSERT INTO wallets (user_id, balance, currency) 
+                 VALUES ($1, $2, $3) 
+                 ON CONFLICT (user_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+                 RETURNING id`,
+                [merchantId, 0.00, 'COIN']
+            );
 
-            if (merchantRes.rows.length === 0) {
-                console.log(`[GW] Merchant ${merchantId} not found. Creating auto-merchant wallet...`);
-                const newWallet = await pool.query(
-                    'INSERT INTO wallets (user_id, balance, currency) VALUES ($1, $2, $3) RETURNING id',
-                    [merchantId, 0.00, 'COIN']
-                );
-                merchantWalletId = newWallet.rows[0].id;
-            } else {
-                merchantWalletId = merchantRes.rows[0].id;
-            }
+            const merchantWalletId = merchantRes.rows[0].id;
+            console.log(`[INIT] Merchant Wallet confirmed: ${merchantWalletId}`);
 
-            // Create payment
+            // Create payment session
             await pool.query(
                 `INSERT INTO payments (payment_id, app_id, amount, reference, to_wallet_id, expires_at, status)
                  VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')`,
                 [token, app.id, amount, referenceId, merchantWalletId, expiresAt]
             );
 
-            const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-            // Assuming the frontend checkout UI is hosted on the same server at /pay?token=...
+            // Fetch the external URL from env or use a smarter default
+            const baseUrl = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
             const paymentUrl = `${baseUrl}/pay?token=${token}`;
 
-            console.log(`[EXTERNAL] Payment Request: ${token} for Reference: ${referenceId}`);
+            console.log(`[INIT] Payment Created: ${token}. Redirecting to: ${paymentUrl}`);
 
             return res.json({
                 success: true,
@@ -153,7 +151,7 @@ function createPaymentRoutes(pool, webhookService) {
             // Find merchant
             const merchantRes = await pool.query('SELECT id FROM wallets WHERE user_id = $1', [merchantId]);
             if (merchantRes.rows.length === 0) {
-                return res.json({ received: false, message: 'Merchant not found' });
+                return res.json({ received: false, message: 'Merchant wallet missing for verify' });
             }
             const merchantWalletId = merchantRes.rows[0].id;
 
