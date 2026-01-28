@@ -263,7 +263,7 @@ export default function OrderSummary() {
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                                                     <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Merchant ID</div>
-                                                    <div className="text-[10px] font-mono font-bold text-slate-700 truncate">f294121c...d81a</div>
+                                                    <div className="text-[10px] font-mono font-bold text-slate-700 truncate">4f756c24...966a</div>
                                                 </div>
                                                 <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
                                                     <div className="text-[8px] font-bold text-indigo-400 uppercase mb-1">Reference ID</div>
