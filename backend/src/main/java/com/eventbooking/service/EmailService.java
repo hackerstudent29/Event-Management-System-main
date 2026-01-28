@@ -123,7 +123,7 @@ public class EmailService {
             // Log error but don't stop the flow in DEV, or throw?
             // User needs to know if it failed.
             System.err.println("FAILED TO SEND EMAIL: " + e.getMessage());
-            throw new RuntimeException("Failed to send OTP email", e);
+            throw new RuntimeException("Failed to send OTP email: " + e.getMessage(), e);
         }
     }
 

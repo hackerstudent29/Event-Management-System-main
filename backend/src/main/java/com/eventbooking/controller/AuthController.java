@@ -28,8 +28,12 @@ public class AuthController {
         private JwtUtil jwtUtil;
 
         @PostMapping("/register")
-        public ResponseEntity<User> register(@RequestBody Dtos.RegisterRequest request) {
-                return ResponseEntity.ok(authService.register(request));
+        public ResponseEntity<?> register(@RequestBody Dtos.RegisterRequest request) {
+                try {
+                        return ResponseEntity.ok(authService.register(request));
+                } catch (RuntimeException e) {
+                        return ResponseEntity.status(400).body(java.util.Map.of("message", e.getMessage()));
+                }
         }
 
         @Autowired
