@@ -121,8 +121,8 @@ function createPaymentRoutes(pool, webhookService) {
                 [token, app.id, amount, referenceId, merchantWalletId, expiresAt]
             );
 
-            // Base URL should point to the Frontend (Vercel) not the API (Railway)
-            const baseUrl = 'https://payment-gateway-beta-two.vercel.app';
+            // Base URL should point to the working Frontend (Vercel)
+            const baseUrl = 'https://payment-via-zenwallet.vercel.app';
             // Route is /scan based on user feedback (not /pay)
             const paymentUrl = `${baseUrl}/scan?token=${token}`;
 

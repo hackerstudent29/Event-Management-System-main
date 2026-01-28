@@ -158,7 +158,7 @@ public class PaymentService {
                     if (token == null || token.isEmpty()) {
                         token = data.optString("token", "");
                     }
-                    paymentUrl = "https://payment-gateway-beta-two.vercel.app/scan?token=" + token;
+                    paymentUrl = "https://payment-via-zenwallet.vercel.app/scan?token=" + token;
                     logger.info("Corrected payment URL: {}", paymentUrl);
                 }
 
