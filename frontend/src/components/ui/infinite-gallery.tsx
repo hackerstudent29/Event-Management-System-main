@@ -241,15 +241,18 @@ function GalleryScene({ images, speed = 1, visibleCount = 8, onActiveImageChange
         });
 
         // Find the "Active" image (closest to focal point)
-        // Focal point is roughly at 20% of depthRange
-        const focalPoint = totalRange * 0.25;
+        // Focal point set to 0.45 to trigger when image is front-and-center (close to camera at 0.5)
+        const focalPoint = totalRange * 0.45;
         let bestDistance = Infinity;
         let activeIdx = 0;
 
         planesRef.current.forEach(plane => {
             const dist = Math.abs(plane.z - focalPoint);
-            if (dist < bestDistance) {
-                bestDistance = dist;
+            // Handle wrap-around distance (since planes cycle)
+            const wrappedDist = Math.min(dist, totalRange - dist);
+
+            if (wrappedDist < bestDistance) {
+                bestDistance = wrappedDist;
                 activeIdx = plane.imageIndex;
             }
         });
