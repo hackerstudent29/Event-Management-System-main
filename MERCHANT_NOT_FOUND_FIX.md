@@ -51,7 +51,7 @@ RETURNING *;
 In Railway → Backend Service → Variables:
 ```
 WALLET_MERCHANT_ID=4f756c24-142b-4143-a957-f8fc5871966a
-WALLET_API_KEY=sk_live_bc459f17b17cdbfd2bdaa17eaf414206
+WALLET_API_KEY=YOUR_WALLET_API_KEY
 WALLET_SERVICE_URL=https://payment-gateway-production-2f82.up.railway.app
 ```
 
