@@ -285,7 +285,7 @@ function FallbackGallery({ images }: { images: ImageItem[] }) {
     );
 }
 
-export default function InfiniteGallery({ images, className = 'h-96 w-full', style, fadeSettings = { fadeIn: { start: 0.05, end: 0.25 }, fadeOut: { start: 0.4, end: 0.43 } }, blurSettings = { blurIn: { start: 0.0, end: 0.1 }, blurOut: { start: 0.4, end: 0.43 }, maxBlur: 8.0 } }: InfiniteGalleryProps) {
+export default function InfiniteGallery({ images, className = 'h-96 w-full', style, onActiveImageChange, fadeSettings = { fadeIn: { start: 0.05, end: 0.25 }, fadeOut: { start: 0.4, end: 0.43 } }, blurSettings = { blurIn: { start: 0.0, end: 0.1 }, blurOut: { start: 0.4, end: 0.43 }, maxBlur: 8.0 } }: InfiniteGalleryProps) {
     const [webglSupported, setWebglSupported] = useState(true);
     useEffect(() => { try { const canvas = document.createElement('canvas'); const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl'); if (!gl) setWebglSupported(false); } catch (e) { setWebglSupported(false); } }, []);
     if (!webglSupported) return <div className={className} style={style}><FallbackGallery images={images} /></div>;
