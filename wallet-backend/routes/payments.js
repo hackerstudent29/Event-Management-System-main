@@ -98,11 +98,19 @@ function createPaymentRoutes(pool, webhookService) {
             const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
             // Find merchant (destination wallet)
-            const merchantRes = await pool.query('SELECT id FROM wallets WHERE user_id = $1', [merchantId]);
+            let merchantRes = await pool.query('SELECT id FROM wallets WHERE user_id = $1', [merchantId]);
+            let merchantWalletId;
+
             if (merchantRes.rows.length === 0) {
-                return res.status(404).json({ success: false, message: 'Merchant not found' });
+                console.log(`[GW] Merchant ${merchantId} not found. Creating auto-merchant wallet...`);
+                const newWallet = await pool.query(
+                    'INSERT INTO wallets (user_id, balance, currency) VALUES ($1, $2, $3) RETURNING id',
+                    [merchantId, 0.00, 'COIN']
+                );
+                merchantWalletId = newWallet.rows[0].id;
+            } else {
+                merchantWalletId = merchantRes.rows[0].id;
             }
-            const merchantWalletId = merchantRes.rows[0].id;
 
             // Create payment
             await pool.query(
