@@ -16,7 +16,7 @@ jobs:
 
       - name: Ping Wallet Service
         run: |
-          curl -I https://payment-gateway-up7l.onrender.com/health || echo "Wallet Ping Failed"
+          curl -I https://payment-gateway-production-2f82.up.railway.app/health || echo "Wallet Ping Failed"
 
       - name: Ping Frontend
         run: |
