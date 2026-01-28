@@ -146,18 +146,19 @@ public class PaymentService {
 
                 response.setStatus("REDIRECT");
 
-                // CRITICAL FIX: Replace Vercel URL with Railway URL if wallet service returns
-                // old URL
+                // CRITICAL FIX: Ensure we point to the Vercel Frontend /scan page
                 String paymentUrl = data.getString("paymentUrl");
-                if (paymentUrl.contains("vercel.app")) {
-                    logger.warn("Wallet service returned Vercel URL, correcting to Railway URL");
-                    // Extract token from URL
+
+                // If the URL is directing to Railway (API) or using /pay, correct it to Vercel
+                // /scan
+                // The API is on Railway, but the Frontend is on Vercel
+                if (paymentUrl.contains("railway.app") || paymentUrl.contains("/pay")) {
+                    logger.warn("Correcting payment URL to Vercel /scan endpoint");
                     String token = response.getTransactionId();
                     if (token == null || token.isEmpty()) {
                         token = data.optString("token", "");
                     }
-                    // Reconstruct with correct Railway URL
-                    paymentUrl = "https://payment-gateway-production-2f82.up.railway.app/pay?token=" + token;
+                    paymentUrl = "https://payment-gateway-beta-two.vercel.app/scan?token=" + token;
                     logger.info("Corrected payment URL: {}", paymentUrl);
                 }
 
