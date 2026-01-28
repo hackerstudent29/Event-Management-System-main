@@ -32,7 +32,7 @@ async function getActiveApps(pool) {
  * Middleware: Authenticate API requests
  * Supports both X-API-Key header and Authorization: Bearer
  */
-async function authenticateApiKey(pool) {
+function authenticateApiKey(pool) {
     return async (req, res, next) => {
         // Try both common header names
         let apiKey = req.headers['x-api-key'] || req.headers['X-API-Key'];
