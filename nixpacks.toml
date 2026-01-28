@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["jdk17"]
+nixPkgs = ["jdk17", "nodejs"]
 
 [phases.build]
 cmds = ["cd backend && chmod +x mvnw && ./mvnw clean package -DskipTests"]
