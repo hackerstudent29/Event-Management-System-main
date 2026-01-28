@@ -145,7 +145,23 @@ public class PaymentService {
                 JSONObject data = jsonRes.getJSONObject("data");
 
                 response.setStatus("REDIRECT");
-                response.setPaymentUrl(data.getString("paymentUrl"));
+
+                // CRITICAL FIX: Replace Vercel URL with Railway URL if wallet service returns
+                // old URL
+                String paymentUrl = data.getString("paymentUrl");
+                if (paymentUrl.contains("vercel.app")) {
+                    logger.warn("Wallet service returned Vercel URL, correcting to Railway URL");
+                    // Extract token from URL
+                    String token = response.getTransactionId();
+                    if (token == null || token.isEmpty()) {
+                        token = data.optString("token", "");
+                    }
+                    // Reconstruct with correct Railway URL
+                    paymentUrl = "https://payment-gateway-production-2f82.up.railway.app/pay?token=" + token;
+                    logger.info("Corrected payment URL: {}", paymentUrl);
+                }
+
+                response.setPaymentUrl(paymentUrl);
                 response.setTransactionId(data.optString("token", ""));
 
                 logger.info("Wallet Payment Initiated Successfully. Token: {}", response.getTransactionId());
