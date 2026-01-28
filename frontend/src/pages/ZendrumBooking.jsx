@@ -13,24 +13,24 @@ const ZendrumBooking = () => {
 
     const descriptions = [
         {
-            title: "CRICKET STADIUM GRAND",
-            text: "Witness the glory of the pitch under the brilliant floodlights, where legends are made and history is written."
+            title: "IMAX ULTIMATE VISION",
+            text: "Immerse yourself in spectacular clarity and scale on the world's most immersive screens."
+        },
+        {
+            title: "DRIVE-IN CINEMA",
+            text: "The classic experience reimagined. Enjoy your favorite blockbusters from the comfort of your own car under the stars."
         },
         {
             title: "4DX CINEMATIC FUSION",
             text: "Experience movies with all your senses. Motion, scents, and weather effects synchronized to every frame."
         },
         {
-            title: "DOLBY ATMOS SOUNDSCAPE",
-            text: "Pristine audio that flows around you with three-dimensional precision, delivering breathtaking clarity and depth."
+            title: "CRICKET STADIUM GRAND",
+            text: "Witness the glory of the pitch under the brilliant floodlights, where legends are made and history is written."
         },
         {
             title: "FOOTBALL ARENA PASSION",
             text: "Feel the electricity of the crowd in world-class stadiums designed for the ultimate match-day atmosphere."
-        },
-        {
-            title: "ULTRA PREMIUM LOUNGE",
-            text: "Unrivaled luxury and comfort for the most exclusive viewing experience, where every seat is the best seat."
         }
     ];
 
