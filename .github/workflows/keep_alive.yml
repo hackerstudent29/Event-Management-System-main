@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Ping Backend
         run: |
-          curl -I https://zendrum-backend.onrender.com/api/bookings/ping || echo "Backend Ping Failed"
+          curl -I https://event-booking-backend-production-05bd.up.railway.app/api/bookings/ping || echo "Backend Ping Failed"
 
       - name: Ping Wallet Service
         run: |

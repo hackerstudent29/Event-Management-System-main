@@ -47,9 +47,11 @@ public class BookingController {
 
             return ResponseEntity.ok(bookings);
         } catch (Exception e) {
-            System.out.println("[BOOKING /my] ERROR: " + e.getMessage());
+            System.out.println("[BOOKING /my] CRITICAL ERROR: " + e.getMessage());
             e.printStackTrace();
-            return ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST).build();
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                    .header("X-Error-Reason", e.getMessage())
+                    .build();
         }
     }
 
