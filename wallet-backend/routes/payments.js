@@ -86,7 +86,7 @@ function createPaymentRoutes(pool, webhookService) {
      * For use with /api/external prefix
      */
     router.post('/create-request', async (req, res) => {
-        const { amount, referenceId, callbackUrl, merchantId } = req.body;
+        const { amount, referenceId, merchantId } = req.body;
         const app = req.app;
 
         if (!amount || !referenceId || !merchantId) {
@@ -94,21 +94,25 @@ function createPaymentRoutes(pool, webhookService) {
         }
 
         try {
-            const token = generatePaymentId(); // Using this as the checkout token
+            const token = generatePaymentId();
             const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
-            // Atomic Upsert for Merchant Wallet (Robust strategy)
-            console.log(`[INIT] Processing payment for Merchant: ${merchantId}`);
-            const merchantRes = await pool.query(
+            // BOMBPROOF STRATEGY: Ensure merchant wallet exists before inserting payment
+            // We use the merchantId provided. If it's the default 0000... we ensure it's there.
+            await pool.query(
                 `INSERT INTO wallets (user_id, balance, currency) 
                  VALUES ($1, $2, $3) 
-                 ON CONFLICT (user_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
-                 RETURNING id`,
+                 ON CONFLICT (user_id) DO NOTHING`,
                 [merchantId, 0.00, 'COIN']
             );
 
+            // Now get the internal wallet ID
+            const merchantRes = await pool.query('SELECT id FROM wallets WHERE user_id = $1', [merchantId]);
+            if (merchantRes.rows.length === 0) {
+                // This should be impossible after the INSERT above, but let's be safe
+                return res.status(404).json({ success: false, message: `Merchant wallet could not be initialized for ${merchantId}` });
+            }
             const merchantWalletId = merchantRes.rows[0].id;
-            console.log(`[INIT] Merchant Wallet confirmed: ${merchantWalletId}`);
 
             // Create payment session
             await pool.query(
@@ -117,11 +121,10 @@ function createPaymentRoutes(pool, webhookService) {
                 [token, app.id, amount, referenceId, merchantWalletId, expiresAt]
             );
 
-            // Fetch the external URL from env or use a smarter default
-            const baseUrl = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+            const baseUrl = process.env.PUBLIC_URL || 'https://payment-gateway-production-2f82.up.railway.app';
             const paymentUrl = `${baseUrl}/pay?token=${token}`;
 
-            console.log(`[INIT] Payment Created: ${token}. Redirecting to: ${paymentUrl}`);
+            console.log(`[GATEWAY] Created Payment ${token} for Merchant ${merchantId}`);
 
             return res.json({
                 success: true,
@@ -132,7 +135,7 @@ function createPaymentRoutes(pool, webhookService) {
             });
         } catch (error) {
             console.error('External Payment Error:', error);
-            return res.status(500).json({ success: false, message: 'Internal Server Error' });
+            return res.status(500).json({ success: false, message: 'Internal Server Error: ' + error.message });
         }
     });
 
@@ -148,10 +151,10 @@ function createPaymentRoutes(pool, webhookService) {
         }
 
         try {
-            // Find merchant
+            // Find internal wallet ID for this merchant User ID
             const merchantRes = await pool.query('SELECT id FROM wallets WHERE user_id = $1', [merchantId]);
             if (merchantRes.rows.length === 0) {
-                return res.json({ received: false, message: 'Merchant wallet missing for verify' });
+                return res.json({ received: false, message: 'Merchant wallet does not exist' });
             }
             const merchantWalletId = merchantRes.rows[0].id;
 
