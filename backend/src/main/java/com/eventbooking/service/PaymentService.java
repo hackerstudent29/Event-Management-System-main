@@ -20,6 +20,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -183,7 +184,8 @@ public class PaymentService {
 
             logger.info("Verifying Wallet Payment: {} (Ref: {})", verifyUrl, referenceId);
 
-            ResponseEntity<String> res = restTemplate.exchange(builder.toUriString(), HttpMethod.GET, entity,
+            ResponseEntity<String> res = restTemplate.exchange(builder.toUriString(),
+                    Objects.requireNonNull(HttpMethod.GET), entity,
                     String.class);
 
             if (res.getBody() != null) {
