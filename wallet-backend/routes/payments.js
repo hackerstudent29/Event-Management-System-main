@@ -121,7 +121,9 @@ function createPaymentRoutes(pool, webhookService) {
                 [token, app.id, amount, referenceId, merchantWalletId, expiresAt]
             );
 
-            const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || 'https://payment-gateway-production-2f82.up.railway.app';
+            // HARDCODED FIX: Always use Railway URL to avoid Vercel redirect issues
+            // Environment variables in Railway seem to be pointing to old Vercel deployment
+            const baseUrl = 'https://payment-gateway-production-2f82.up.railway.app';
             const paymentUrl = `${baseUrl}/pay?token=${token}`;
 
             console.log(`[GATEWAY] Created Payment ${token} for Merchant ${merchantId}`);
