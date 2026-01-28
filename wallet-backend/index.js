@@ -13,11 +13,11 @@ app.use(express.json());
 
 // Database Connection
 const pool = new Pool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'password',
-    database: process.env.DB_NAME || 'event_booking',
-    port: process.env.DB_PORT || 5432,
+    host: process.env.DB_HOST || 'aws-1-ap-south-1.pooler.supabase.com',
+    user: process.env.DB_USER || 'postgres.dlpxciimpvqugavnitne',
+    password: process.env.DB_PASSWORD || 'RAMAZENDRUM',
+    database: process.env.DB_NAME || 'postgres',
+    port: process.env.DB_PORT || 6543,
     connectionString: process.env.DATABASE_URL, // Prefer connectionString if provided
     ssl: { rejectUnauthorized: false } // Required for Supabase Direct Connection
 });
