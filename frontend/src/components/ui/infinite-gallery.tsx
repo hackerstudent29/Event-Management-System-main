@@ -24,6 +24,7 @@ interface InfiniteGalleryProps {
     falloff?: { near: number; far: number };
     fadeSettings?: FadeSettings;
     blurSettings?: BlurSettings;
+    onActiveImageChange?: (index: number) => void;
     className?: string;
     style?: React.CSSProperties;
 }
@@ -129,7 +130,7 @@ function ImagePlane({ texture, position, scale, material }: { texture: THREE.Tex
     );
 }
 
-function GalleryScene({ images, speed = 1, visibleCount = 8, fadeSettings = { fadeIn: { start: 0.05, end: 0.15 }, fadeOut: { start: 0.85, end: 0.95 } }, blurSettings = { blurIn: { start: 0.0, end: 0.1 }, blurOut: { start: 0.9, end: 1.0 }, maxBlur: 3.0 } }: Omit<InfiniteGalleryProps, 'className' | 'style'>) {
+function GalleryScene({ images, speed = 1, visibleCount = 8, onActiveImageChange, fadeSettings = { fadeIn: { start: 0.05, end: 0.15 }, fadeOut: { start: 0.85, end: 0.95 } }, blurSettings = { blurIn: { start: 0.0, end: 0.1 }, blurOut: { start: 0.9, end: 1.0 }, maxBlur: 3.0 } }: Omit<InfiniteGalleryProps, 'className' | 'style'>) {
     const { gl } = useThree();
     const [scrollVelocity, setScrollVelocity] = useState(0);
     const [autoPlay, setAutoPlay] = useState(true);
@@ -238,6 +239,24 @@ function GalleryScene({ images, speed = 1, visibleCount = 8, fadeSettings = { fa
             materials[i].uniforms.opacity.value = opacity;
             materials[i].uniforms.blurAmount.value = blur;
         });
+
+        // Find the "Active" image (closest to focal point)
+        // Focal point is roughly at 20% of depthRange
+        const focalPoint = totalRange * 0.25;
+        let bestDistance = Infinity;
+        let activeIdx = 0;
+
+        planesRef.current.forEach(plane => {
+            const dist = Math.abs(plane.z - focalPoint);
+            if (dist < bestDistance) {
+                bestDistance = dist;
+                activeIdx = plane.imageIndex;
+            }
+        });
+
+        if (onActiveImageChange) {
+            onActiveImageChange(activeIdx);
+        }
     });
 
     return (
@@ -273,7 +292,14 @@ export default function InfiniteGallery({ images, className = 'h-96 w-full', sty
     return (
         <div className={className} style={style}>
             <Canvas camera={{ position: [0, 0, 0], fov: 55 }} gl={{ antialias: true, alpha: true }}>
-                <Suspense fallback={null}><GalleryScene images={images} fadeSettings={fadeSettings} blurSettings={blurSettings} /></Suspense>
+                <Suspense fallback={null}>
+                    <GalleryScene
+                        images={images}
+                        fadeSettings={fadeSettings}
+                        blurSettings={blurSettings}
+                        onActiveImageChange={onActiveImageChange}
+                    />
+                </Suspense>
             </Canvas>
         </div>
     );

@@ -13,25 +13,26 @@ const ZendrumBooking = () => {
 
     const descriptions = [
         {
-            title: "4DX EXPERIENCE",
-            text: "Feel every moment with motion-synchronized seating and environmental effects that pull you into the heart of the action."
+            title: "CRICKET STADIUM GRAND",
+            text: "Witness the glory of the pitch under the brilliant floodlights, where legends are made and history is written."
         },
         {
-            title: "DOLBY ATMOS",
-            text: "Surround yourself with hyper-realistic sound that moves all around you, creating a powerful, moving movie experience."
+            title: "4DX CINEMATIC FUSION",
+            text: "Experience movies with all your senses. Motion, scents, and weather effects synchronized to every frame."
         },
         {
-            title: "PREMIUM STADIUMS",
-            text: "Experience the grandeur of world-class arenas with crystal clear views, vibrant floodlights, and the roar of the crowd."
+            title: "DOLBY ATMOS SOUNDSCAPE",
+            text: "Pristine audio that flows around you with three-dimensional precision, delivering breathtaking clarity and depth."
+        },
+        {
+            title: "FOOTBALL ARENA PASSION",
+            text: "Feel the electricity of the crowd in world-class stadiums designed for the ultimate match-day atmosphere."
+        },
+        {
+            title: "ULTRA PREMIUM LOUNGE",
+            text: "Unrivaled luxury and comfort for the most exclusive viewing experience, where every seat is the best seat."
         }
     ];
-
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setCurrentTextIndex((prev) => (prev + 1) % descriptions.length);
-        }, 8000); // Change text every 8 seconds to match the animation cycle
-        return () => clearInterval(timer);
-    }, []);
 
     const galleryImages = [
         "/posters/poster_0.png",
@@ -41,8 +42,14 @@ const ZendrumBooking = () => {
         "/posters/poster_4.png"
     ];
 
+    // Sync text with the image currently in focus
+    const handleActiveImageChange = React.useCallback((index) => {
+        if (index !== currentTextIndex) {
+            setCurrentTextIndex(index);
+        }
+    }, [currentTextIndex]);
+
     const handleTripleClick = (e) => {
-        // Detect triple click (e.detail will be 3)
         if (e.detail === 3) {
             navigate('/');
         }
@@ -59,6 +66,7 @@ const ZendrumBooking = () => {
                     images={galleryImages}
                     className="h-full w-full opacity-60"
                     speed={1.2}
+                    onActiveImageChange={handleActiveImageChange}
                 />
             </div>
 
@@ -78,7 +86,7 @@ const ZendrumBooking = () => {
                             text={descriptions[currentTextIndex].text}
                             fontSize="text-2xl md:text-3xl lg:text-4xl"
                             textColor="text-white"
-                            animationDelay={4000}
+                            animationDelay={5000}
                             className="!min-h-0 py-4"
                         />
                     </div>
