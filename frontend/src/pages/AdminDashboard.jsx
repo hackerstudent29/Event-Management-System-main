@@ -572,6 +572,7 @@ const AdminDashboard = () => {
             setBookingOpenDate(null);
             setBookingOpenTime("10:00");
             setZoneConfigs({}); // Reset zone configurations
+            setRowAssignments([]); // Reset row assignments
         } catch (error) {
             console.error("Event Creation/Update Error Full:", error);
             let errorMessage = error.response?.data?.message || error.message || 'Failed to process event.';
