@@ -51,6 +51,14 @@ public class PaymentController {
             @RequestBody Dtos.ProcessWalletPaymentRequest request) {
 
         try {
+            // Validate seat availability before initiating payment
+            if (request.getBookings() != null) {
+                for (Dtos.BookingRequest br : request.getBookings()) {
+                    bookingService.validateSeatAvailability(br.getEventCategoryId(), br.getSeatIds(),
+                            request.getFromUserId());
+                }
+            }
+
             // 1. Initiate Hosted Payment Session
             Dtos.WalletTransferInitiationRequest walletRequest = new Dtos.WalletTransferInitiationRequest();
             walletRequest.setFromUserId(request.getFromUserId());

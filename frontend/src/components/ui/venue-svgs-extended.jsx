@@ -42,7 +42,7 @@ const ImaxBaseSvg = ({ onZoneClick, activeZones = [], zoneMap = {}, adminMode = 
         return max > 0 ? max : 20;
     }, [rowAssignments]);
 
-    const cols = 20;
+    const defaultCols = 20; // Default seat count
     const seatSize = 20;
     const seatGap = 6;
     const startY = 120;
@@ -67,7 +67,7 @@ const ImaxBaseSvg = ({ onZoneClick, activeZones = [], zoneMap = {}, adminMode = 
         // Use Category ID if available
         const catId = assignment?.id;
 
-        const baseCols = assignment ? (assignment.seatsPerRow || cols) : cols;
+        const baseCols = assignment ? (assignment.seatsPerRow || defaultCols) : defaultCols;
         const rowWidth = baseCols * (seatSize + seatGap);
         const rowY = startY + (row - 1) * (seatSize + seatGap);
 
@@ -173,7 +173,7 @@ export const StandardCinemaSingleScreenSvg = ({ onZoneClick, activeZones = [], z
         return max > 0 ? max : 16;
     }, [rowAssignments]);
 
-    const cols = 20;
+    const defaultCols = 20; // Default seat count
     const seatSize = 22;
     const seatGap = 7;
     const startY = 120;
@@ -182,7 +182,7 @@ export const StandardCinemaSingleScreenSvg = ({ onZoneClick, activeZones = [], z
     const getRowAssignment = (row) => rowAssignments.find(a => a.rows.includes(row));
 
     const seats = [];
-    const totalWidth = cols * (seatSize + seatGap) + (seatGap * 2);
+    const totalWidth = defaultCols * (seatSize + seatGap) + (seatGap * 2);
     const gridStartX = centerX - totalWidth / 2;
 
     for (let row = 1; row <= rows; row++) {
@@ -197,7 +197,7 @@ export const StandardCinemaSingleScreenSvg = ({ onZoneClick, activeZones = [], z
         const forcedColor = assignment ? assignment.color : null;
         const catId = assignment?.id;
 
-        const baseCols = assignment ? (assignment.seatsPerRow || cols) : cols;
+        const baseCols = assignment ? (assignment.seatsPerRow || defaultCols) : defaultCols;
         const currentRowCols = (row === rows) ? baseCols + 1 : baseCols;
         const hasGap = currentRowCols > 10 && row !== rows;
         const gapSize = hasGap ? 20 : 0;
@@ -284,19 +284,19 @@ export const DolbyAtmosSvg = ({ onZoneClick, activeZones = [], zoneMap = {}, adm
         return max > 0 ? max : 13;
     }, [rowAssignments]);
 
-    const cols = 20;
+    const defaultCols = 20; // Default seat count
     const seatSize = 24;
     const seatGap = 8;
     const startY = 120;
     const centerX = 400;
     // MIDPOINT GAP: 9|GAP|9 for 18 seats
-    const gapPosition = Math.floor(cols / 2);
+    const gapPosition = Math.floor(defaultCols / 2);
 
     // Helper to get assigned category/color from rowAssignments
     const getRowAssignment = (row) => rowAssignments.find(a => a.rows.includes(row));
 
     const seats = [];
-    const totalWidth = cols * (seatSize + seatGap) + (seatGap * 2);
+    const totalWidth = defaultCols * (seatSize + seatGap) + (seatGap * 2);
     const gridStartX = centerX - totalWidth / 2;
 
     for (let row = 1; row <= rows; row++) {
@@ -315,7 +315,7 @@ export const DolbyAtmosSvg = ({ onZoneClick, activeZones = [], zoneMap = {}, adm
         const catId = assignment?.id;
 
         // Dynamic layout & Gaps
-        const baseCols = assignment ? (assignment.seatsPerRow || cols) : cols;
+        const baseCols = assignment ? (assignment.seatsPerRow || defaultCols) : defaultCols;
         const currentRowCols = (row === rows) ? baseCols + 1 : baseCols;
         const hasGap = currentRowCols > 10 && row !== rows;
         const gapSize = hasGap ? 20 : 0;
@@ -398,7 +398,8 @@ export const FourDXStandardSvg = ({ onZoneClick, activeZones = [], zoneMap = {},
         const max = Math.max(...rowAssignments.flatMap(a => a.rows));
         return max > 0 ? max : 10;
     }, [rowAssignments]);
-    const cols = 16, seatSize = 26, seatGap = 10, startY = 120, centerX = 400;
+    const defaultCols = 16; // Default seat count for 4DX
+    const seatSize = 26, seatGap = 10, startY = 120, centerX = 400;
     // STRICT 4DX: Only 4, 8, 12, 16 seats allowed. Gaps every 4 seats: 4|GAP|4|GAP|4|GAP|4
     const gapPositions = [4, 8, 12]; // Gaps after seats 4, 8, 12
 
@@ -406,7 +407,7 @@ export const FourDXStandardSvg = ({ onZoneClick, activeZones = [], zoneMap = {},
     const getRowAssignment = (row) => rowAssignments.find(a => a.rows.includes(row));
 
     const seats = [];
-    const totalWidth = cols * (seatSize + seatGap) + (gapPositions.length * seatGap * 2);
+    const totalWidth = defaultCols * (seatSize + seatGap) + (gapPositions.length * seatGap * 2);
     const gridStartX = centerX - totalWidth / 2;
 
     for (let row = 1; row <= rows; row++) {
@@ -423,8 +424,8 @@ export const FourDXStandardSvg = ({ onZoneClick, activeZones = [], zoneMap = {},
 
         // Dynamic Centering for 4DX Standard
         const offsetPx = (row === rows) ? 0 : (gapPositions.length * seatGap * 2);
-        const baseCols = assignment ? (assignment.seatsPerRow || cols) : cols;
-        const currentRowCols = Math.min(baseCols, cols); // Cap at 16
+        const baseCols = assignment ? (assignment.seatsPerRow || defaultCols) : defaultCols;
+        const currentRowCols = Math.min(baseCols, 16); // Cap at 16
 
         const rowWidth = currentRowCols * (seatSize + seatGap) - seatGap + offsetPx;
         const rowStartX = centerX - rowWidth / 2;
@@ -849,47 +850,90 @@ export const ScreenXSideWallSvg = ({ onZoneClick, activeZones = [], zoneMap = {}
     );
 };
 
-// 6. DRIVE-IN Car Grid (Parking Spots)
-export const DriveInCarGridSvg = ({ onZoneClick, activeZones = [], zoneMap = {}, adminMode = false }) => {
+// 6. DRIVE-IN Car Grid (Parking Spots) - NOW WITH ROW ASSIGNMENTS
+export const DriveInCarGridSvg = ({ onZoneClick, activeZones = [], zoneMap = {}, adminMode = false, rowAssignments = [], onSeatClick, selectedSeats = [], occupiedSeats = [] }) => {
     const getProps = useZoneProps(zoneMap, activeZones, onZoneClick, adminMode);
 
-    const rows = 6, cols = 10, spotWidth = 35, spotHeight = 25, spotGap = 8, startY = 80, centerX = 400;
-    const zoneMapping = { zone_parking_front: [1, 2], zone_parking_middle: [3, 4], zone_parking_rear: [5, 6] };
-    const getZoneForRow = (row) => Object.entries(zoneMapping).find(([_, rows]) => rows.includes(row))?.[0] || 'zone_parking_general';
+    // Dynamic row count based on row assignments
+    const rows = React.useMemo(() => {
+        if (!rowAssignments || rowAssignments.length === 0) return 6;
+        const max = Math.max(...rowAssignments.flatMap(a => a.rows));
+        return max > 0 ? max : 6;
+    }, [rowAssignments]);
+
+    const defaultCols = 10; // Default parking spots per row
+    const spotWidth = 35, spotHeight = 25, spotGap = 8, startY = 80, centerX = 400;
+
+    const getRowAssignment = (row) => rowAssignments.find(a => a.rows.includes(row));
 
     const spots = [];
-    const totalWidth = cols * (spotWidth + spotGap);
-    const gridStartX = centerX - totalWidth / 2;
 
     for (let row = 1; row <= rows; row++) {
         const rowLabel = String.fromCharCode(64 + row);
-        const currentZone = getZoneForRow(row);
-        const zoneProps = getProps(currentZone, '');
+        const assignment = getRowAssignment(row);
+        const isAssigned = !!assignment;
+
+        if (!adminMode && !isAssigned) continue;
+
+        const currentZone = isAssigned ? assignment.categoryName : 'Unassigned';
+        const forcedColor = assignment ? assignment.color : null;
+        const catId = assignment?.id;
+
+        const baseCols = assignment ? (assignment.seatsPerRow || defaultCols) : defaultCols;
+        const totalWidth = baseCols * (spotWidth + spotGap);
+        const gridStartX = centerX - totalWidth / 2;
 
         // Render Row Labels
-        spots.push(
-            <text key={`label-L-${row}`} x={gridStartX - 30} y={startY + (row - 1) * (spotHeight + spotGap) + 15}
-                className="text-xs font-bold fill-slate-300 opacity-60" textAnchor="middle">{rowLabel}</text>
-        );
-        spots.push(
-            <text key={`label-R-${row}`} x={gridStartX + totalWidth + 30} y={startY + (row - 1) * (spotHeight + spotGap) + 15}
-                className="text-xs font-bold fill-slate-300 opacity-60" textAnchor="middle">{rowLabel}</text>
-        );
+        if (adminMode || isAssigned) {
+            spots.push(
+                <text key={`label-L-${row}`} x={gridStartX - 30} y={startY + (row - 1) * (spotHeight + spotGap) + 15}
+                    className={cn("text-xs font-bold fill-slate-300", !isAssigned && "opacity-40")} textAnchor="middle">{rowLabel}</text>
+            );
+            spots.push(
+                <text key={`label-R-${row}`} x={gridStartX + totalWidth + 30} y={startY + (row - 1) * (spotHeight + spotGap) + 15}
+                    className={cn("text-xs font-bold fill-slate-300", !isAssigned && "opacity-40")} textAnchor="middle">{rowLabel}</text>
+            );
+        }
 
-        for (let col = 1; col <= cols; col++) {
+        for (let col = 1; col <= baseCols; col++) {
             const x = gridStartX + (col - 1) * (spotWidth + spotGap);
             const y = startY + (row - 1) * (spotHeight + spotGap);
             const spotId = `${rowLabel}${col}`;
+            const fullSpotId = catId ? `${catId}::${spotId}` : spotId;
+            const isSelected = selectedSeats && selectedSeats.includes(fullSpotId);
+            const isSold = occupiedSeats && occupiedSeats.includes(fullSpotId);
 
             spots.push(
-                <rect key={spotId} x={x} y={y} width={spotWidth} height={spotHeight} rx="2"
-                    className={cn("parking-spot transition-all cursor-pointer stroke-slate-600",
-                        zoneProps.occupied && "opacity-30 cursor-not-allowed",
-                        !zoneProps.occupied && !zoneProps.selected && "fill-slate-700 hover:fill-slate-500",
-                        zoneProps.selected && "fill-emerald-600",
-                        zoneProps.color && !zoneProps.selected && `fill-[${zoneProps.color}]`)}
-                    strokeWidth="2" strokeDasharray="3,3" data-spot={spotId} data-zone={currentZone}
-                    onClick={(e) => { e.stopPropagation(); if (!zoneProps.occupied && onZoneClick) onZoneClick(currentZone); }} />
+                <g key={spotId}>
+                    <rect x={x} y={y} width={spotWidth} height={spotHeight} rx="2"
+                        className={cn("parking-spot transition-all cursor-pointer",
+                            !isAssigned && "fill-slate-700 opacity-50 hover:opacity-100",
+                            isSold && "opacity-30 fill-slate-700",
+                            isAssigned && !isSold && !isSelected && "hover:brightness-110"
+                        )}
+                        style={{
+                            fill: isSold ? '#374151' : (isSelected ? '#10b981' : (forcedColor || '#475569')),
+                            stroke: isSold ? '#6b7280' : (isSelected ? '#10b981' : '#64748b'),
+                            strokeWidth: isSelected ? '3' : '2',
+                            strokeDasharray: '3,3',
+                            pointerEvents: isSold ? 'none' : 'auto',
+                            cursor: isSold ? 'not-allowed' : 'pointer'
+                        }}
+                        data-spot={fullSpotId} data-zone={currentZone}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (isAssigned && !isSold) {
+                                if (onSeatClick) onSeatClick(fullSpotId);
+                                else if (onZoneClick) onZoneClick(currentZone);
+                            }
+                        }} />
+                    <text x={x + spotWidth / 2} y={y + spotHeight / 2 + 1}
+                        textAnchor="middle" dominantBaseline="middle"
+                        className="pointer-events-none text-[8px] font-bold"
+                        style={{ fill: isSold ? '#9ca3af' : (isSelected ? '#ffffff' : '#e2e8f0') }}>
+                        {col}
+                    </text>
+                </g>
             );
         }
     }

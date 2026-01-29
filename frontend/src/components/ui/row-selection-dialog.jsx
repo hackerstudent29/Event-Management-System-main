@@ -10,24 +10,35 @@ import { X, Save, Plus } from 'lucide-react';
  * Allows admin to click rows on the seat map and assign categories
  */
 export const RowSelectionDialog = ({ isOpen, onClose, selectedRows, subtype, onSave, initialData }) => {
+    // Dynamic seat limits based on theatre subtype
+    const getDefaultSeats = (subtype) => {
+        const driveInTypes = ['Drive-In', 'Car Grid', 'Arena Parking'];
+        return driveInTypes.includes(subtype) ? '10' : '20';
+    };
+
+    const getMaxSeats = (subtype) => {
+        const driveInTypes = ['Drive-In', 'Car Grid', 'Arena Parking'];
+        return driveInTypes.includes(subtype) ? 10 : 20;
+    };
+
     const [categoryName, setCategoryName] = useState(initialData?.categoryName || '');
     const [price, setPrice] = useState(initialData?.price || '');
-    const [seatsPerRow, setSeatsPerRow] = useState(initialData?.seatsPerRow || '20');
+    const [seatsPerRow, setSeatsPerRow] = useState(initialData?.seatsPerRow || getDefaultSeats(subtype));
     const [color, setColor] = useState(initialData?.color || '#3B82F6');
 
     React.useEffect(() => {
         if (isOpen && initialData) {
             setCategoryName(initialData.categoryName || '');
             setPrice(initialData.price || '');
-            setSeatsPerRow(initialData.seatsPerRow || '20');
+            setSeatsPerRow(initialData.seatsPerRow || getDefaultSeats(subtype));
             setColor(initialData.color || '#3B82F6');
         } else if (isOpen) {
             setCategoryName('');
             setPrice('');
-            setSeatsPerRow('20');
+            setSeatsPerRow(getDefaultSeats(subtype));
             setColor('#3B82F6');
         }
-    }, [isOpen, initialData]);
+    }, [isOpen, initialData, subtype]);
 
     // Category suggestions based on subtype
     const categoryOptions = {
@@ -138,14 +149,18 @@ export const RowSelectionDialog = ({ isOpen, onClose, selectedRows, subtype, onS
                             value={seatsPerRow}
                             onChange={(e) => {
                                 const val = parseInt(e.target.value);
-                                if (val > 30) setSeatsPerRow('30');
+                                const maxSeats = getMaxSeats(subtype);
+                                if (val > maxSeats) setSeatsPerRow(maxSeats.toString());
                                 else setSeatsPerRow(e.target.value);
                             }}
-                            placeholder="Default: 20"
+                            placeholder={`Default: ${getDefaultSeats(subtype)}`}
                             min="1"
-                            max="30"
+                            max={getMaxSeats(subtype)}
                             className="w-full"
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Maximum {getMaxSeats(subtype)} seats for {subtype || 'this theatre type'}
+                        </p>
                     </div>
 
                     {/* Color */}

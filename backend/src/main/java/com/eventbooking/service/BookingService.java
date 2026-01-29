@@ -32,6 +32,7 @@ public class BookingService {
 
     @Transactional
     public Booking bookSeats(Dtos.BookingRequest request) {
+        validateSeatAvailability(request.getEventCategoryId(), request.getSeatIds(), request.getUserId());
         // We now book by Category
         // Note: We need pessimistic lock on the CATEGORY row to ensure atomic seat
         // updates
@@ -107,6 +108,7 @@ public class BookingService {
 
     @Transactional
     public void holdSeats(Dtos.BookingRequest request) {
+        validateSeatAvailability(request.getEventCategoryId(), request.getSeatIds(), request.getUserId());
         // Clear any previous holds by this user for this category
         seatHoldRepository.deleteByUserIdAndEventCategoryId(request.getUserId(), request.getEventCategoryId());
 
@@ -217,6 +219,42 @@ public class BookingService {
         booking.setCheckedIn(false);
         booking.setCheckedInAt(null);
         bookingRepository.save(booking);
+    }
+
+    public void validateSeatAvailability(UUID categoryId, java.util.List<String> requestedSeats, UUID currentUserId) {
+        if (requestedSeats == null || requestedSeats.isEmpty())
+            return;
+
+        java.util.List<Booking> confirmed = bookingRepository.findByEventCategory_IdAndStatus(categoryId, "CONFIRMED");
+        java.util.Set<String> taken = new java.util.HashSet<>();
+
+        for (Booking b : confirmed) {
+            String ids = b.getSeatIdentifiers();
+            if (ids != null && !ids.isEmpty()) {
+                String[] split = ids.split(", ");
+                for (String s : split)
+                    taken.add(s);
+            }
+        }
+
+        java.util.List<com.eventbooking.model.SeatHold> holds = seatHoldRepository
+                .findByEventCategoryIdAndExpiresAtAfter(categoryId, java.time.LocalDateTime.now());
+        for (com.eventbooking.model.SeatHold h : holds) {
+            if (!h.getUserId().equals(currentUserId)) {
+                String ids = h.getSeatIdentifiers();
+                if (ids != null && !ids.isEmpty()) {
+                    String[] split = ids.split(", ");
+                    for (String s : split)
+                        taken.add(s);
+                }
+            }
+        }
+
+        for (String req : requestedSeats) {
+            if (taken.contains(req)) {
+                throw new RuntimeException("Seat " + req + " is no longer available.");
+            }
+        }
     }
 
     public java.util.List<String> getOccupiedSeats(UUID categoryId) {

@@ -31,7 +31,7 @@ export default function OrderSummary() {
             if (!hasExpired.current) {
                 hasExpired.current = true;
                 showMessage("Session expired. Your seat hold has been released.", { type: 'error' });
-                navigate('/');
+                navigate(event?.id ? ('/events/' + event.id) : '/');
             }
             return;
         }

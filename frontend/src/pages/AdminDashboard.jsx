@@ -1162,7 +1162,33 @@ const AdminDashboard = () => {
                             {/* NEW: Row Selection Overlay */}
                             {rowSelectionMode && (
                                 <RowSelectionOverlay
-                                    totalRows={26}
+                                    totalRows={(() => {
+                                        // Dynamic row count based on theatre subtype
+                                        const rowLimits = {
+                                            'IMAX': 6,
+                                            'Large Format IMAX': 6,
+                                            'Laser IMAX': 6,
+                                            'Digital IMAX': 6,
+                                            'Standard Cinema': 6,
+                                            'Single Screen': 6,
+                                            'Dolby Atmos': 6,
+                                            '4DX': 6,
+                                            '4DX Standard': 6,
+                                            'Motion Seats': 6,
+                                            'ScreenX': 6,
+                                            'Standard ScreenX': 6,
+                                            'Side-Wall Immersion': 6,
+                                            'Drive-In': 6,
+                                            'Car Grid': 6,
+                                            'Arena Parking': 6,
+                                            'Premium Lounge': 6,
+                                            'Luxury Recliners': 6,
+                                            'VIP Pods': 6,
+                                            'Outdoor Cinema': 6,
+                                            'Open Air': 6
+                                        };
+                                        return rowLimits[newEvent.eventSubType] || rowLimits[newEvent.seatingLayoutVariant] || 6;
+                                    })()}
                                     assignedRows={rowAssignments.flatMap(a => a.rows)}
                                     onRowsSelected={(rows) => {
                                         setSelectedRowsForDialog(rows);
