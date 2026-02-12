@@ -23,8 +23,8 @@ public class WebhookController {
     @Value("${wallet.webhook.secret:placeholder}")
     private String webhookSecret;
 
-    // @Autowired
-    // private BookingService bookingService;
+    @Autowired
+    private com.eventbooking.service.PaymentService paymentService;
 
     @Autowired
     private SocketIOService socketIOService;
@@ -54,23 +54,16 @@ public class WebhookController {
             if ("payment.success".equals(event) && "SUCCESS".equals(status)) {
                 System.out.println("Processing Successful Payment for Reference: " + reference);
 
-                // In a real flow, checking 'reference' against pending bookings would happen
-                // here.
-                // Since our current 'reference' is the 'orderId' or 'bookingId' logic,
-                // we might need to store the booking intent first.
+                // Process booking synchronously here for reliability
+                boolean success = paymentService.processSuccessfulPayment(reference);
 
-                // For this migration, we are simply confirming the flow works.
-                // Specifically for the 'initiateWalletTransfer' flow, we already booked the
-                // seats synchronously
-                // in the 'complete' step of the 'initiateWalletTransfer' method in
-                // PaymentController.
-                // BUT, to be "Reactive", we should ideally book seats HERE.
-
-                // For now, let's just emit the socket update to frontend to confirm visibility
                 Dtos.WalletTransferResponse response = new Dtos.WalletTransferResponse();
-                response.setStatus("SUCCESS");
+                response.setStatus(success ? "SUCCESS" : "FAILED");
                 response.setReference(reference);
                 response.setAmount(root.path("amount").asDouble());
+                if (!success) {
+                    response.setReason("Internal Booking Error or already processed");
+                }
 
                 socketIOService.sendPaymentUpdate(reference, response);
             }

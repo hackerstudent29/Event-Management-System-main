@@ -91,8 +91,10 @@ public class SecurityConfig {
         config.setAllowedOriginPatterns(Arrays.asList(
                 "http://localhost:3000",
                 "http://localhost:5173",
+                "http://localhost:5174",
                 "http://127.0.0.1:3000",
                 "http://127.0.0.1:5173",
+                "http://127.0.0.1:5174",
                 "https://zendrumbooking.vercel.app",
                 "https://*.vercel.app",
                 "https://zendrumbooking-*.vercel.app"));

@@ -129,11 +129,49 @@ public class BookingService {
         }
 
         hold.setExpiresAt(java.time.LocalDateTime.now().plusSeconds(300)); // 5 minute hold
+        hold.setStatus("HELD");
         seatHoldRepository.save(hold);
 
         // Periodic cleanup of expired holds - can be moved to a scheduler but for MVP
         // we run it here
         seatHoldRepository.deleteByExpiresAtBefore(java.time.LocalDateTime.now());
+    }
+
+    @Transactional
+    public void prepareHoldsForPayment(UUID userId, String referenceId, List<Dtos.BookingRequest> requests) {
+        for (Dtos.BookingRequest req : requests) {
+            // Find existing hold for this user and category
+            List<com.eventbooking.model.SeatHold> holds = seatHoldRepository.findByEventCategoryIdAndExpiresAtAfter(
+                    req.getEventCategoryId(), java.time.LocalDateTime.now());
+
+            com.eventbooking.model.SeatHold userHold = holds.stream()
+                    .filter(h -> h.getUserId().equals(userId))
+                    .findFirst()
+                    .orElse(null);
+
+            if (userHold != null) {
+                userHold.setReferenceId(referenceId);
+                userHold.setStatus("PAYING");
+                // Extend hold to 15 minutes for payment process
+                userHold.setExpiresAt(java.time.LocalDateTime.now().plusSeconds(900));
+                seatHoldRepository.save(userHold);
+            } else {
+                // If somehow hold is missing, try to create it if seats are still available
+                holdSeats(req);
+                // Call again to set reference (recursive or direct)
+                List<com.eventbooking.model.SeatHold> newHolds = seatHoldRepository
+                        .findByEventCategoryIdAndExpiresAtAfter(
+                                req.getEventCategoryId(), java.time.LocalDateTime.now());
+                com.eventbooking.model.SeatHold freshHold = newHolds.stream()
+                        .filter(h -> h.getUserId().equals(userId))
+                        .findFirst()
+                        .orElseThrow(() -> new RuntimeException("Could not secure hold for payment"));
+                freshHold.setReferenceId(referenceId);
+                freshHold.setStatus("PAYING");
+                freshHold.setExpiresAt(java.time.LocalDateTime.now().plusSeconds(900));
+                seatHoldRepository.save(freshHold);
+            }
+        }
     }
 
     public List<Booking> getUserBookings(@org.springframework.lang.NonNull UUID userId) {

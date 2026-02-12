@@ -204,5 +204,11 @@ public class Dtos {
         private double amount;
         private String reference;
         private java.util.List<BookingRequest> bookings;
+        private String zenWalletUserId;
+        // Direct Auth Fields
+        private String cardNumber;
+        private String cardCvv;
+        private String cardExpiry;
+        private String walletPassword;
     }
 }

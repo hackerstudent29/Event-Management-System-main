@@ -11,4 +11,6 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Booking> findByEventCategory_Event_Id(UUID eventId);
 
     List<Booking> findByEventCategory_IdAndStatus(UUID categoryId, String status);
+
+    boolean existsByPaymentId(String paymentId);
 }

@@ -24,6 +24,12 @@ public class SeatHold {
     @Column(name = "seat_identifiers", columnDefinition = "TEXT")
     private String seatIdentifiers;
 
+    @Column(name = "reference_id")
+    private String referenceId; // Link to payment reference
+
+    @Column(name = "status")
+    private String status; // 'HELD', 'PAYING', 'BOOKED'
+
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 }

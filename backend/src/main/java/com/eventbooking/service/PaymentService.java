@@ -6,6 +6,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.eventbooking.dto.Dtos;
 
@@ -17,11 +18,17 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import org.springframework.transaction.annotation.Transactional;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.eventbooking.model.PendingPayment;
+import com.eventbooking.repository.PendingPaymentRepository;
+import java.util.Arrays;
 
 @Service
 public class PaymentService {
@@ -42,6 +49,11 @@ public class PaymentService {
 
     @Value("${wallet.merchant.id}")
     private String walletMerchantId;
+
+    @Autowired
+    private PendingPaymentRepository pendingPaymentRepository;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // In-memory storage for pending bookings (ReferenceId -> BookingRequest List)
     private final Map<String, List<Dtos.BookingRequest>> pendingBookings = new ConcurrentHashMap<>();
@@ -94,13 +106,27 @@ public class PaymentService {
         Dtos.WalletTransferResponse response = new Dtos.WalletTransferResponse();
 
         try {
-            // 1. Store bookings locally to claim later
+            // 1. Store bookings locally and in DB to claim later
             if (bookings != null) {
                 pendingBookings.put(request.getReference(), bookings);
+                try {
+                    String payloadJson = objectMapper.writeValueAsString(bookings);
+                    pendingPaymentRepository.save(new PendingPayment(request.getReference(), payloadJson));
+                    logger.info("Saved pending booking to DB for ref: {}", request.getReference());
+                } catch (JsonProcessingException e) {
+                    logger.error("Failed to serialize booking payload", e);
+                }
             }
 
             // 2. Prepare External API Request
             String createUrl = walletServiceUrl + "/api/external/create-request";
+
+            // Cleanup old pending payments (e.g., > 24 hours) as a maintenance step
+            try {
+                pendingPaymentRepository.deleteByCreatedAtBefore(java.time.LocalDateTime.now().minusDays(1));
+            } catch (Exception e) {
+                logger.error("Maintenance: Failed to cleanup old pending payments", e);
+            }
 
             JSONObject payload = new JSONObject();
             payload.put("amount", request.getAmount()); // Amount in cents/smallest unit
@@ -109,7 +135,7 @@ public class PaymentService {
 
             // Construct Callback URL (must be accessible to user)
             // Ideally, this should be a configurable property
-            String callbackUrl = "https://zendrumbooking.vercel.app/payment-success?ref=" + request.getReference();
+            String callbackUrl = "http://localhost:5173/payment-success?ref=" + request.getReference();
             payload.put("callbackUrl", callbackUrl);
 
             HttpHeaders headers = new HttpHeaders();
@@ -145,22 +171,12 @@ public class PaymentService {
                 JSONObject data = jsonRes.getJSONObject("data");
 
                 response.setStatus("REDIRECT");
-
-                // CRITICAL FIX: Ensure we point to the Vercel Frontend /scan page
-                String paymentUrl = data.getString("paymentUrl");
-
-                // If the URL is directing to Railway (API) or using /pay, correct it to Vercel
-                // /scan
-                // The API is on Railway, but the Frontend is on Vercel
-                if (paymentUrl.contains("railway.app") || paymentUrl.contains("/pay")) {
-                    logger.warn("Correcting payment URL to Vercel /scan endpoint");
-                    String token = response.getTransactionId();
-                    if (token == null || token.isEmpty()) {
-                        token = data.optString("token", "");
-                    }
-                    paymentUrl = "https://payment-via-zenwallet.vercel.app/scan?token=" + token;
-                    logger.info("Corrected payment URL: {}", paymentUrl);
+                String token = response.getTransactionId();
+                if (token == null || token.isEmpty()) {
+                    token = data.optString("token", "");
                 }
+                String paymentUrl = "http://localhost:5173/scan?token=" + token;
+                logger.info("Local corrected payment URL: {}", paymentUrl);
 
                 response.setPaymentUrl(paymentUrl);
                 response.setTransactionId(data.optString("token", ""));
@@ -178,6 +194,90 @@ public class PaymentService {
             response.setReason("Internal Server Error: " + e.getMessage());
         }
 
+        return response;
+    }
+
+    /**
+     * 1b. Process Direct Wallet Transfer (Card/ID)
+     */
+    public Dtos.WalletTransferResponse processDirectWalletTransfer(Dtos.ProcessWalletPaymentRequest request) {
+        Dtos.WalletTransferResponse response = new Dtos.WalletTransferResponse();
+        RestTemplate restTemplate = new RestTemplate();
+
+        String referenceId = request.getReference();
+        double amount = request.getAmount();
+
+        try {
+            // 1. Save bookings as pending
+            if (request.getBookings() != null) {
+                pendingBookings.put(referenceId, request.getBookings());
+                try {
+                    String payloadJson = objectMapper.writeValueAsString(request.getBookings());
+                    pendingPaymentRepository.save(new PendingPayment(referenceId, payloadJson));
+                } catch (Exception e) {
+                    logger.error("Failed to persist pending booking", e);
+                }
+            }
+
+            // 2. Call ZenWallet Direct API
+            String transferUrl = walletServiceUrl + "/api/external/transfer";
+
+            JSONObject payload = new JSONObject();
+            if (request.getZenWalletUserId() != null) {
+                payload.put("fromUserId", request.getZenWalletUserId());
+            }
+            if (request.getWalletPassword() != null) {
+                payload.put("cardNumber", request.getCardNumber());
+                payload.put("cardCvv", request.getCardCvv());
+                payload.put("cardExpiry", request.getCardExpiry());
+                payload.put("password", request.getWalletPassword());
+            }
+
+            payload.put("toWalletId", walletMerchantId);
+            payload.put("amount", amount);
+            payload.put("referenceId", referenceId);
+            payload.put("orderId", referenceId);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Content-Type", "application/json");
+            headers.set("x-api-key", walletApiKey);
+
+            HttpEntity<String> entity = new HttpEntity<>(payload.toString(), headers);
+
+            String responseStr = restTemplate.postForObject(transferUrl, entity, String.class);
+            JSONObject jsonRes = new JSONObject(responseStr);
+
+            if (jsonRes.optBoolean("success")) {
+                // Payment success! Now finalize booking.
+                // We reuse processSuccessfulPayment which verifies and books.
+                if (processSuccessfulPayment(referenceId)) {
+                    response.setStatus("SUCCESS");
+                    response.setTransactionId(jsonRes.optString("transactionId"));
+                } else {
+                    response.setStatus("FAILED_AT_BOOKING");
+                    response.setReason("Payment successful but booking failed. Ref: " + referenceId);
+                }
+            } else {
+                response.setStatus("FAILED");
+                response.setReason(jsonRes.optString("message", "Payment Denied"));
+            }
+
+        } catch (Exception e) {
+            // Handle 402/404 from RestTemplate errors
+            if (e instanceof org.springframework.web.client.HttpClientErrorException) {
+                org.springframework.web.client.HttpClientErrorException he = (org.springframework.web.client.HttpClientErrorException) e;
+                try {
+                    JSONObject errJson = new JSONObject(he.getResponseBodyAsString());
+                    response.setReason(errJson.optString("message", he.getStatusText()));
+                } catch (Exception ignore) {
+                    response.setReason(he.getMessage());
+                }
+            } else {
+                response.setReason(e.getMessage());
+            }
+            response.setStatus("FAILED");
+            logger.error("Direct transfer error", e);
+        }
         return response;
     }
 
@@ -229,10 +329,56 @@ public class PaymentService {
     }
 
     public List<Dtos.BookingRequest> getPendingBookings(String referenceId) {
-        return pendingBookings.getOrDefault(referenceId, Collections.emptyList());
+        if (referenceId == null)
+            return Collections.emptyList();
+        List<Dtos.BookingRequest> inMemory = pendingBookings.get(referenceId);
+        if (inMemory != null)
+            return inMemory;
+
+        // Fallback to DB
+        return pendingPaymentRepository.findById(referenceId).map(p -> {
+            try {
+                return Arrays.asList(objectMapper.readValue(p.getBookingPayload(), Dtos.BookingRequest[].class));
+            } catch (JsonProcessingException e) {
+                logger.error("Failed to deserialize booking payload from DB", e);
+                return null;
+            }
+        }).orElse(Collections.emptyList());
     }
 
     public void removePendingBooking(String referenceId) {
         pendingBookings.remove(referenceId);
+        if (referenceId != null) {
+            pendingPaymentRepository.deleteById(referenceId);
+        }
+    }
+
+    @Autowired
+    private BookingService bookingService;
+
+    @Autowired
+    private com.eventbooking.repository.BookingRepository bookingRepository;
+
+    @Transactional
+    public boolean processSuccessfulPayment(String referenceId) {
+        // Idempotency check: Have we already booked this reference?
+        if (bookingRepository.existsByPaymentId(referenceId)) {
+            logger.info("Payment already processed for reference: {}", referenceId);
+            return true;
+        }
+
+        if (finalizeWalletPayment(referenceId)) {
+            List<Dtos.BookingRequest> requests = getPendingBookings(referenceId);
+            if (requests != null && !requests.isEmpty()) {
+                for (Dtos.BookingRequest br : requests) {
+                    br.setPaymentId(referenceId); // Link reference for idempotency and tracking
+                    bookingService.bookSeats(br);
+                }
+                removePendingBooking(referenceId);
+                return true;
+            }
+            logger.warn("No pending bookings found for reference: {}", referenceId);
+        }
+        return false;
     }
 }

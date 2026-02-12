@@ -9,7 +9,11 @@ import java.util.UUID;
 public interface SeatHoldRepository extends JpaRepository<SeatHold, UUID> {
     List<SeatHold> findByEventCategoryIdAndExpiresAtAfter(UUID categoryId, LocalDateTime now);
 
+    List<SeatHold> findByReferenceId(String referenceId);
+
     void deleteByExpiresAtBefore(LocalDateTime now);
 
     void deleteByUserIdAndEventCategoryId(UUID userId, UUID categoryId);
+
+    void deleteByReferenceId(String referenceId);
 }

@@ -9,7 +9,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.util.Collections;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -46,6 +45,41 @@ public class PaymentController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/process-direct-payment")
+    public ResponseEntity<Dtos.WalletTransferResponse> processDirectPayment(
+            @RequestBody Dtos.ProcessWalletPaymentRequest request) {
+
+        try {
+            // Validate seat availability
+            if (request.getBookings() != null) {
+                for (Dtos.BookingRequest br : request.getBookings()) {
+                    bookingService.validateSeatAvailability(br.getEventCategoryId(), br.getSeatIds(),
+                            request.getFromUserId());
+                }
+                bookingService.prepareHoldsForPayment(request.getFromUserId(), request.getReference(),
+                        request.getBookings());
+            }
+
+            if (request.getZenWalletUserId() == null && request.getWalletPassword() == null) {
+                Dtos.WalletTransferResponse error = new Dtos.WalletTransferResponse();
+                error.setStatus("FAILED");
+                error.setReason("ZenWallet User ID or Password + Card required");
+                return ResponseEntity.badRequest().body(error);
+            }
+
+            Dtos.WalletTransferResponse response = paymentService.processDirectWalletTransfer(request);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            logger.error("Error processing direct payment", e);
+            Dtos.WalletTransferResponse errorResponse = new Dtos.WalletTransferResponse();
+            errorResponse.setStatus("FAILED");
+            errorResponse.setReason("INTERNAL_ERROR: " + e.toString());
+            return ResponseEntity.ok(errorResponse);
+        }
+    }
+
     @PostMapping("/initiate-wallet-transfer")
     public ResponseEntity<Dtos.WalletTransferResponse> initiateWalletTransfer(
             @RequestBody Dtos.ProcessWalletPaymentRequest request) {
@@ -57,6 +91,9 @@ public class PaymentController {
                     bookingService.validateSeatAvailability(br.getEventCategoryId(), br.getSeatIds(),
                             request.getFromUserId());
                 }
+                // Secure holds and link to reference
+                bookingService.prepareHoldsForPayment(request.getFromUserId(), request.getReference(),
+                        request.getBookings());
             }
 
             // 1. Initiate Hosted Payment Session
@@ -83,25 +120,15 @@ public class PaymentController {
     public ResponseEntity<?> finalizeWalletPayment(@RequestBody Map<String, String> payload) {
         String referenceId = payload.get("referenceId");
 
-        if (paymentService.finalizeWalletPayment(referenceId)) {
-            // Retrieve pending bookings
-            List<Dtos.BookingRequest> requests = paymentService.getPendingBookings(referenceId);
-            if (requests != null && !requests.isEmpty()) {
-                try {
-                    for (Dtos.BookingRequest br : requests) {
-                        bookingService.bookSeats(br);
-                    }
-                    paymentService.removePendingBooking(referenceId);
-                    return ResponseEntity.ok(Collections.singletonMap("success", true));
-                } catch (Exception e) {
-                    logger.error("Error finalizing booking for ref: " + referenceId, e);
-                    return ResponseEntity.internalServerError().body("Booking failed after payment");
-                }
+        try {
+            if (paymentService.processSuccessfulPayment(referenceId)) {
+                return ResponseEntity.ok(Collections.singletonMap("success", true));
             } else {
-                return ResponseEntity.badRequest().body("No pending booking found for this payment reference.");
+                return ResponseEntity.badRequest().body("Payment verification failed or no pending bookings found.");
             }
+        } catch (Exception e) {
+            logger.error("Error finalize booking for ref: " + referenceId, e);
+            return ResponseEntity.internalServerError().body("Booking failed: " + e.getMessage());
         }
-
-        return ResponseEntity.badRequest().body("Payment verification failed.");
     }
 }

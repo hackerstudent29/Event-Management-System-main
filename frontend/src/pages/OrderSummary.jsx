@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import axios from "axios";
 import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -24,6 +25,58 @@ export default function OrderSummary() {
     const [walletStatus, setWalletStatus] = useState('idle'); // idle, verifying
     const { showMessage } = useMessage();
     const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
+    const [cardData, setCardData] = useState({
+        number: '',
+        name: '',
+        expiry: '',
+        cvv: '',
+        password: ''
+    });
+    const [cardUser, setCardUser] = useState(null);
+    const [verifyingCard, setVerifyingCard] = useState(false);
+    const [cardError, setCardError] = useState(null);
+
+    // Calculation logic - moved up to avoid ReferenceError
+    const ticketPrice = Number((purchasedItems || []).reduce((acc, item) => acc + Number(item.total || 0), 0));
+    const totalQty = Number((purchasedItems || []).reduce((acc, item) => acc + Number(item.count || 0), 0));
+    const convenienceFee = totalQty > 0 ? (30.00 + Math.max(0, totalQty - 1) * 15.00) : 0;
+    const gstAmount = Number((convenienceFee * 0.18).toFixed(2));
+    const totalAmount = ticketPrice + convenienceFee + gstAmount;
+
+    React.useEffect(() => {
+        const verifyCardDetails = async () => {
+            const rawNumber = cardData.number.replace(/\s/g, '');
+            if (rawNumber.length === 16 &&
+                cardData.expiry.length === 5 &&
+                cardData.cvv.length === 3) {
+
+                setVerifyingCard(true);
+                setCardError(null);
+                try {
+                    const [month, year] = cardData.expiry.split('/');
+                    const response = await axios.post('http://localhost:5000/api/external/verify-card', {
+                        cardNumber: rawNumber,
+                        cvv: cardData.cvv,
+                        expiryMonth: month,
+                        expiryYear: `20${year}`,
+                        amount: totalAmount
+                    });
+                    setCardUser(response.data.user);
+                } catch (err) {
+                    setCardUser(null);
+                    setCardError(err.response?.data?.message || "User not exists in ZenWallet system");
+                } finally {
+                    setVerifyingCard(false);
+                }
+            } else {
+                setCardUser(null);
+                setCardError(null);
+            }
+        };
+
+        const timeoutId = setTimeout(verifyCardDetails, 600);
+        return () => clearTimeout(timeoutId);
+    }, [cardData.number, cardData.expiry, cardData.cvv, totalAmount]);
 
     const hasExpired = React.useRef(false);
     React.useEffect(() => {
@@ -76,12 +129,6 @@ export default function OrderSummary() {
         );
     }
 
-    // Calculation logic - unified tiered logic (30 + 15*(n-1) with 18% GST)
-    const ticketPrice = Number((purchasedItems || []).reduce((acc, item) => acc + Number(item.total || 0), 0));
-    const totalQty = Number((purchasedItems || []).reduce((acc, item) => acc + Number(item.count || 0), 0));
-    const convenienceFee = totalQty > 0 ? (30.00 + Math.max(0, totalQty - 1) * 15.00) : 0;
-    const gstAmount = Number((convenienceFee * 0.18).toFixed(2));
-    const totalAmount = ticketPrice + convenienceFee + gstAmount;
 
     React.useEffect(() => {
         // Initialize STOMP connection
@@ -127,6 +174,59 @@ export default function OrderSummary() {
     }, [referenceId, showMessage]);
 
     const handleWalletPayment = async () => {
+        // Check if user is trying to use card input
+        const hasCardInput = cardData.number && cardData.number.replace(/\s/g, '').length >= 15;
+
+        if (hasCardInput) {
+            if (!cardUser) {
+                showMessage("Please provide valid card details or clear the fields to use QR checkout.", { type: 'error' });
+                return;
+            }
+            if (cardError) {
+                showMessage("Cannot process: " + cardError, { type: 'error' });
+                return;
+            }
+
+            // Direct Payment Flow
+            setIsProcessing(true);
+            try {
+                const payload = {
+                    fromUserId: user.id, // System User
+                    zenWalletUserId: cardUser?.id, // ZenWallet User
+                    amount: totalAmount,
+                    reference: referenceId,
+                    bookings: bookingPayload,
+                    // Direct Auth Fields
+                    cardNumber: cardData.number.replace(/\s/g, ''),
+                    cardCvv: cardData.cvv,
+                    cardExpiry: cardData.expiry,
+                    walletPassword: cardData.password
+                };
+                console.log("Processing Direct Payment with payload:", payload);
+                if (!payload.zenWalletUserId && !payload.walletPassword) {
+
+                    console.error("Missing zenWalletUserId in payload via cardUser:", cardUser);
+                    throw new Error("Invalid card user detected. Please retry verification.");
+                }
+
+                const response = await api.post('/payments/process-direct-payment', payload);
+
+                if (response.data.status === 'SUCCESS') {
+                    setBookingConfirmed(true);
+                    showMessage("Payment Successful!", { type: 'success' });
+                } else {
+                    throw new Error(response.data.reason || "Payment Failed");
+                }
+            } catch (err) {
+                console.error("Direct Payment Error:", err);
+                showMessage(err.response?.data?.reason || err.message || "Payment Failed", { type: 'error' });
+            } finally {
+                setIsProcessing(false);
+            }
+            return;
+        }
+
+        // Legacy Redirect Flow
         setIsProcessing(true);
         setWalletStatus('verifying');
 
@@ -145,9 +245,6 @@ export default function OrderSummary() {
             } else {
                 throw new Error(response.data.reason || "Start Payment Failed");
             }
-
-
-
 
         } catch (err) {
             console.error("Wallet Payment Error:", err);
@@ -250,36 +347,6 @@ export default function OrderSummary() {
                                     </div>
                                 </div>
 
-                                {paymentMethod === 'wallet' && (
-                                    <div className="mt-4 ml-9 space-y-4 animate-in slide-in-from-top-2 fade-in duration-300">
-                                        <div className="p-5 bg-white border border-indigo-100 rounded-2xl shadow-sm space-y-4">
-                                            <div className="flex flex-col items-center text-center space-y-2">
-                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payment Instructions</div>
-                                                <p className="text-xs text-slate-600">
-                                                    Please complete the payment in your <span className="font-bold text-indigo-600">Wallet App</span> using the details below:
-                                                </p>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                                    <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Merchant ID</div>
-                                                    <div className="text-[10px] font-mono font-bold text-slate-700 truncate">4f756c24...966a</div>
-                                                </div>
-                                                <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                                                    <div className="text-[8px] font-bold text-indigo-400 uppercase mb-1">Reference ID</div>
-                                                    <div className="text-sm font-mono font-black text-indigo-700">{referenceId}</div>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
-                                                <div className="text-amber-500 mt-0.5">⚠️</div>
-                                                <p className="text-[10px] text-amber-700 leading-relaxed italic">
-                                                    The system will check if a transaction with this <b>Reference ID</b> exists for the merchant.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </label>
 
                             {/* UPI Option */}
@@ -342,9 +409,120 @@ export default function OrderSummary() {
 
                                 {/* Expanded State for Card */}
                                 {paymentMethod === 'card' && (
-                                    <div className="mt-4 ml-9 animate-in slide-in-from-top-2 fade-in duration-200">
-                                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-center">
-                                            <p className="text-sm text-slate-500 italic">Card fields would appear here (Demo Mode)</p>
+                                    <div className="mt-4 ml-9 animate-in slide-in-from-top-2 fade-in duration-300">
+                                        <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4 shadow-inner">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Cardholder Name</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="John Doe"
+                                                    value={cardData.name}
+                                                    onChange={(e) => setCardData({ ...cardData, name: e.target.value })}
+                                                    className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all text-sm font-medium"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Card Number</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="0000 0000 0000 0000"
+                                                        value={cardData.number}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value.replace(/\s/g, '').replace(/(\d{4})/g, '$1 ').trim();
+                                                            if (val.length <= 19) setCardData({ ...cardData, number: val });
+                                                        }}
+                                                        className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all text-sm font-medium tabular-nums"
+                                                    />
+                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1">
+                                                        <div className="w-8 h-5 bg-slate-100 rounded border border-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-400 text-center leading-[1]">VISA</div>
+                                                        <div className="w-8 h-5 bg-slate-100 rounded border border-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-400 text-center leading-[1]">MC</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Expiry Date</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="MM/YY"
+                                                        value={cardData.expiry}
+                                                        onChange={(e) => {
+                                                            let val = e.target.value.replace(/\D/g, '');
+                                                            if (val.length > 2) val = val.substring(0, 2) + '/' + val.substring(2, 4);
+                                                            if (val.length <= 5) setCardData({ ...cardData, expiry: val });
+                                                        }}
+                                                        className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all text-sm font-medium tabular-nums"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">CVV</label>
+                                                    <input
+                                                        type="password"
+                                                        placeholder="***"
+                                                        maxLength="3"
+                                                        value={cardData.cvv}
+                                                        onChange={(e) => setCardData({ ...cardData, cvv: e.target.value.replace(/\D/g, '') })}
+                                                        className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all text-sm font-medium tabular-nums"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Password Field */}
+                                            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-500">
+                                                <div className="flex justify-between">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">ZenWallet Password</label>
+                                                    <span className="text-[10px] text-indigo-500 font-medium">Required for Direct Debit</span>
+                                                </div>
+                                                <input
+                                                    type="password"
+                                                    placeholder="Enter your secure password"
+                                                    value={cardData.password}
+                                                    onChange={(e) => setCardData({ ...cardData, password: e.target.value })}
+                                                    className="w-full h-12 px-4 bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm font-medium"
+                                                />
+                                            </div>
+
+
+                                            {/* Verification Result Display */}
+                                            {(verifyingCard || cardUser || cardError) && (
+                                                <div className={cn(
+                                                    "p-3 rounded-xl border flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-300",
+                                                    verifyingCard ? "bg-slate-100 border-slate-200" :
+                                                        cardUser ? "bg-emerald-50 border-emerald-100" : "bg-red-50 border-red-100"
+                                                )}>
+                                                    {verifyingCard ? (
+                                                        <>
+                                                            <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                                                            <span className="text-xs font-medium text-slate-600">Verifying card in ZenWallet...</span>
+                                                        </>
+                                                    ) : cardUser ? (
+                                                        <>
+                                                            <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-bold text-xs">
+                                                                {cardUser.fullName.charAt(0)}
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-tight">Verified ZenWallet User</p>
+                                                                <p className="text-sm font-bold text-slate-900 leading-tight">{cardUser.fullName}</p>
+                                                                <p className="text-[10px] text-slate-500">{cardUser.email}</p>
+                                                            </div>
+                                                            <div className="text-emerald-500">
+                                                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                                </svg>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div className="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center font-bold text-lg">!</div>
+                                                            <div className="flex-1">
+                                                                <p className="text-[10px] font-bold text-red-700 uppercase tracking-tight">Verification Failed</p>
+                                                                <p className="text-sm font-bold text-red-600 leading-tight">{cardError}</p>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
