@@ -5,4 +5,4 @@ nixPkgs = ["jdk17"]
 cmds = ["chmod +x mvnw", "./mvnw clean package -DskipTests"]
 
 [start]
-cmd = "java -Dserver.port=$PORT -jar target/EventBookingBackend.jar"
+cmd = "java -Xmx352m -Xss512k -XX:TieredStopAtLevel=1 -Dserver.port=$PORT -jar target/EventBookingBackend.jar"
