@@ -4,7 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import InfiniteGallery from "@/components/ui/infinite-gallery";
-import DynamicTextAnimation from "@/components/ui/dynamic-text-animation";
+import BlurTextAnimation from "@/components/ui/blur-text-animation";
 
 const ZendrumBooking = () => {
     const { user } = useAuth();
@@ -14,28 +14,23 @@ const ZendrumBooking = () => {
     const descriptions = [
         {
             title: "IMAX ULTIMATE VISION",
-            text: "Immerse yourself in spectacular clarity and scale on the world's most immersive screens.",
-            animation: "blur"
+            text: "Immerse yourself in spectacular clarity and scale on the world's most immersive screens."
         },
         {
             title: "DRIVE-IN CINEMA",
-            text: "The classic experience reimagined. Enjoy your favorite blockbusters from the comfort of your own car under the stars.",
-            animation: "slide"
+            text: "The classic experience reimagined. Enjoy your favorite blockbusters from the comfort of your own car under the stars."
         },
         {
             title: "4DX CINEMATIC FUSION",
-            text: "Experience movies with all your senses. Motion, scents, and weather effects synchronized to every frame.",
-            animation: "zoom"
+            text: "Experience movies with all your senses. Motion, scents, and weather effects synchronized to every frame."
         },
         {
             title: "CRICKET STADIUM GRAND",
-            text: "Witness the glory of the pitch under the brilliant floodlights, where legends are made and history is written.",
-            animation: "wave"
+            text: "Witness the glory of the pitch under the brilliant floodlights, where legends are made and history is written."
         },
         {
             title: "FOOTBALL ARENA PASSION",
-            text: "Feel the electricity of the crowd in world-class stadiums designed for the ultimate match-day atmosphere.",
-            animation: "blur"
+            text: "Feel the electricity of the crowd in world-class stadiums designed for the ultimate match-day atmosphere."
         }
     ];
 
@@ -78,31 +73,23 @@ const ZendrumBooking = () => {
             {/* Cinematic Text Overlay */}
             <div className="absolute inset-0 flex flex-col items-center justify-center z-40 pointer-events-none">
                 <div className="max-w-4xl px-6 text-center">
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={currentTextIndex}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.5 }}
-                            className="flex flex-col items-center"
+                    <div key={currentTextIndex} className="flex flex-col items-center">
+                        <motion.span
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-blue-400 font-bold tracking-[0.5em] text-xs md:text-sm mb-4 uppercase"
                         >
-                            <motion.span
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="text-blue-400 font-bold tracking-[0.5em] text-xs md:text-sm mb-4 uppercase"
-                            >
-                                {descriptions[currentTextIndex].title}
-                            </motion.span>
-                            <DynamicTextAnimation
-                                text={descriptions[currentTextIndex].text}
-                                type={descriptions[currentTextIndex].animation}
-                                fontSize="text-2xl md:text-3xl lg:text-4xl"
-                                textColor="text-white"
-                                className="!min-h-0 py-4"
-                            />
-                        </motion.div>
-                    </AnimatePresence>
+                            {descriptions[currentTextIndex].title}
+                        </motion.span>
+                        <BlurTextAnimation
+                            key={`text-${currentTextIndex}`}
+                            text={descriptions[currentTextIndex].text}
+                            fontSize="text-2xl md:text-3xl lg:text-4xl"
+                            textColor="text-white"
+                            animationDelay={5000}
+                            className="!min-h-0 py-4"
+                        />
+                    </div>
                 </div>
             </div>
 

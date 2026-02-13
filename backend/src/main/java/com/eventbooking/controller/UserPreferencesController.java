@@ -13,7 +13,6 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/user/preferences")
 @RequiredArgsConstructor
-@CrossOrigin(origins = { "http://localhost:3000", "https://zendrumbooking.vercel.app" })
 public class UserPreferencesController {
 
     private final UserPreferencesService preferencesService;
