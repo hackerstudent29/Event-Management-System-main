@@ -90,21 +90,11 @@ public class SecurityConfig {
                 CorsConfiguration config = new CorsConfiguration();
 
                 config.setAllowCredentials(true);
-                config.addAllowedOrigin("https://zendrumbooking.vercel.app");
-                config.addAllowedOriginPattern("https://*.vercel.app");
-                config.addAllowedOriginPattern("http://localhost:*");
-                config.addAllowedOriginPattern("http://127.0.0.1:*");
-
-                config.setAllowedHeaders(Arrays.asList(
-                                "Authorization",
-                                "Content-Type",
-                                "Accept",
-                                "X-Requested-With",
-                                "Origin",
-                                "Bypass-Tunnel-Reminder"));
-                config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-
+                config.addAllowedOriginPattern("*");
+                config.addAllowedHeader("*");
+                config.addAllowedMethod("*");
                 config.addExposedHeader("Authorization");
+                config.setMaxAge(3600L);
 
                 source.registerCorsConfiguration("/**", config);
 
