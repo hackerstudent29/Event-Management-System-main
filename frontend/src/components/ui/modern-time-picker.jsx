@@ -61,6 +61,19 @@ export function ModernTimePicker({ value, onChange, minTime, disabled }) {
         return false;
     };
 
+    const isMinuteDisabled = (mStr) => {
+        if (!minTime) return false;
+        let h24 = parseInt(selH);
+        if (selP === "PM" && h24 !== 12) h24 += 12;
+        if (selP === "AM" && h24 === 12) h24 = 0;
+
+        if (h24 < minH) return true;
+        if (h24 > minH) return false;
+
+        // Same hour, check minutes
+        return parseInt(mStr) < minM;
+    };
+
     const hoursList = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0"));
     const minutesList = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, "0"));
     const periods = ["AM", "PM"];
@@ -107,8 +120,9 @@ export function ModernTimePicker({ value, onChange, minTime, disabled }) {
 
         // Final validation before confirming
         if (minTime && typeof minTime === 'string') {
-            const [currMinH] = minTime.split(':').map(Number);
-            if (h24 < currMinH) return; // Prevent confirming invalid time
+            const [currMinH, currMinM] = minTime.split(':').map(Number);
+            if (h24 < currMinH) return; // Prevent confirming invalid hour
+            if (h24 === currMinH && parseInt(selM) < currMinM) return; // Prevent confirming invalid minute
         }
 
         onChange(time24);
@@ -188,18 +202,22 @@ export function ModernTimePicker({ value, onChange, minTime, disabled }) {
                         onScroll={() => handleScroll(mRef, minutesList, setSelM)}
                         className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-[68px] scroll-smooth snap-y snap-mandatory"
                     >
-                        {minutesList.map(m => (
-                            <button
-                                key={m}
-                                onClick={() => scrollTo(mRef, m, minutesList)}
-                                className={cn(
-                                    "flex items-center justify-center w-full h-10 text-sm snap-center transition-all duration-200",
-                                    selM === m ? "text-primary font-semibold scale-110" : "text-slate-300 hover:text-slate-400"
-                                )}
-                            >
-                                {m}
-                            </button>
-                        ))}
+                        {minutesList.map(m => {
+                            const disabled = isMinuteDisabled(m);
+                            return (
+                                <button
+                                    key={m}
+                                    onClick={() => !disabled && scrollTo(mRef, m, minutesList)}
+                                    className={cn(
+                                        "flex items-center justify-center w-full h-10 text-sm snap-center transition-all duration-200",
+                                        selM === m ? "text-primary font-semibold scale-110" : "text-slate-300 hover:text-slate-400",
+                                        disabled && "opacity-20 cursor-not-allowed pointer-events-none text-slate-200"
+                                    )}
+                                >
+                                    {m}
+                                </button>
+                            );
+                        })}
                     </div>
 
                     <div className="w-px bg-slate-50 my-6" />

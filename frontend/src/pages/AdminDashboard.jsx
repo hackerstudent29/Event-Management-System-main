@@ -944,9 +944,8 @@ const AdminDashboard = () => {
                                                 if (sel.setHours(0, 0, 0, 0) !== now.setHours(0, 0, 0, 0)) return null;
 
                                                 const future = new Date();
-                                                future.setHours(future.getHours() + 3);
+                                                // future.setHours(future.getHours() + 3);
 
-                                                // If +3 hours is tomorrow, disable all of today
                                                 if (future.getDate() !== new Date().getDate()) return "24:00";
 
                                                 return `${future.getHours().toString().padStart(2, '0')}:${future.getMinutes().toString().padStart(2, '0')}`;
@@ -982,9 +981,8 @@ const AdminDashboard = () => {
                                                 if (sel.setHours(0, 0, 0, 0) !== now.setHours(0, 0, 0, 0)) return null;
 
                                                 const future = new Date();
-                                                future.setHours(future.getHours() + 3);
+                                                // future.setHours(future.getHours() + 3);
 
-                                                // If +3 hours is tomorrow, disable all of today
                                                 if (future.getDate() !== new Date().getDate()) return "24:00";
 
                                                 return `${future.getHours().toString().padStart(2, '0')}:${future.getMinutes().toString().padStart(2, '0')}`;
