@@ -50,6 +50,9 @@ public class PaymentService {
     @Value("${wallet.merchant.id}")
     private String walletMerchantId;
 
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
     @Autowired
     private PendingPaymentRepository pendingPaymentRepository;
 
@@ -133,10 +136,12 @@ public class PaymentService {
             payload.put("merchantId", walletMerchantId);
             payload.put("referenceId", request.getReference());
 
-            // Construct Callback URL (must be accessible to user)
-            // Ideally, this should be a configurable property
-            String callbackUrl = "http://localhost:5173/payment-success?ref=" + request.getReference();
-            payload.put("callbackUrl", callbackUrl);
+            // Construct Success and Cancel Callback URLs
+            String successUrl = frontendUrl + "/payment-success?ref=" + request.getReference();
+            String cancelUrl = frontendUrl + "/events/" + request.getReference().split("-")[0]; // Return to event page
+
+            payload.put("callbackUrl", successUrl);
+            payload.put("cancelUrl", cancelUrl);
 
             HttpHeaders headers = new HttpHeaders();
             headers.set("Content-Type", "application/json");
@@ -175,8 +180,8 @@ public class PaymentService {
                 if (token == null || token.isEmpty()) {
                     token = data.optString("token", "");
                 }
-                String paymentUrl = "http://localhost:5173/scan?token=" + token;
-                logger.info("Local corrected payment URL: {}", paymentUrl);
+                String paymentUrl = walletServiceUrl + \"/scan?token=\" + token;
+                logger.info(\"Payment URL generated: {}\", paymentUrl);
 
                 response.setPaymentUrl(paymentUrl);
                 response.setTransactionId(data.optString("token", ""));
