@@ -62,16 +62,24 @@ export function ModernTimePicker({ value, onChange, minTime, disabled }) {
     };
 
     const isMinuteDisabled = (mStr) => {
-        if (!minTime) return false;
-        let h24 = parseInt(selH);
-        if (selP === "PM" && h24 !== 12) h24 += 12;
-        if (selP === "AM" && h24 === 12) h24 = 0;
+        if (!minTime || !selH || !selP) return false;
 
-        if (h24 < minH) return true;
-        if (h24 > minH) return false;
+        try {
+            let h24 = parseInt(selH);
+            if (isNaN(h24)) return false;
 
-        // Same hour, check minutes
-        return parseInt(mStr) < minM;
+            if (selP === "PM" && h24 !== 12) h24 += 12;
+            if (selP === "AM" && h24 === 12) h24 = 0;
+
+            if (h24 < minH) return true;
+            if (h24 > minH) return false;
+
+            // Same hour, check minutes
+            return parseInt(mStr) < minM;
+        } catch (e) {
+            console.warn('Error in isMinuteDisabled:', e);
+            return false;
+        }
     };
 
     const hoursList = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0"));
@@ -211,7 +219,7 @@ export function ModernTimePicker({ value, onChange, minTime, disabled }) {
                                     className={cn(
                                         "flex items-center justify-center w-full h-10 text-sm snap-center transition-all duration-200",
                                         selM === m ? "text-primary font-semibold scale-110" : "text-slate-300 hover:text-slate-400",
-                                        disabled && "opacity-20 cursor-not-allowed pointer-events-none text-slate-200"
+                                        disabled && "opacity-40 cursor-not-allowed text-slate-400"
                                     )}
                                 >
                                     {m}
