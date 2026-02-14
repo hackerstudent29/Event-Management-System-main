@@ -180,8 +180,8 @@ public class PaymentService {
                 if (token == null || token.isEmpty()) {
                     token = data.optString("token", "");
                 }
-                String paymentUrl = walletServiceUrl + \"/scan?token=\" + token;
-                logger.info(\"Payment URL generated: {}\", paymentUrl);
+                String paymentUrl = walletServiceUrl + "/scan?token=" + token;
+                logger.info("Payment URL generated: {}", paymentUrl);
 
                 response.setPaymentUrl(paymentUrl);
                 response.setTransactionId(data.optString("token", ""));
