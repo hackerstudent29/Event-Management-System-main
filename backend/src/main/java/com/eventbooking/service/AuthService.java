@@ -41,13 +41,22 @@ public class AuthService {
 
     public User login(Dtos.LoginRequest request) {
         Optional<User> userOpt = userRepository.findByEmail(request.getEmail());
-        if (userOpt.isPresent() && passwordEncoder.matches(request.getPassword(), userOpt.get().getPassword())) {
+        if (userOpt.isPresent()) {
             User user = userOpt.get();
-            // if (!user.isEmailVerified()) {
-            // throw new RuntimeException("Email not verified. Please verify your email to
-            // log in.");
-            // }
-            return user;
+            String storedPassword = user.getPassword();
+
+            if (storedPassword == null) {
+                // Cannot authenticate a user with no password via this method
+                throw new RuntimeException("Invalid credentials");
+            }
+
+            if (passwordEncoder.matches(request.getPassword(), storedPassword)) {
+                // if (!user.isEmailVerified()) {
+                // throw new RuntimeException("Email not verified. Please verify your email to
+                // log in.");
+                // }
+                return user;
+            }
         }
         throw new RuntimeException("Invalid credentials");
     }

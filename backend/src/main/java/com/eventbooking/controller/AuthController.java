@@ -116,10 +116,13 @@ public class AuthController {
                         return ResponseEntity.ok(new Dtos.LoginResponse(jwt, user.getId(), user.getName(),
                                         user.getEmail(), user.getRole()));
                 } catch (Exception e) {
+                        e.printStackTrace(); // Log full stack trace
                         System.out.println("LOGIN FAILED EXCEPTION: " + e.getMessage());
-                        String msg = e.getMessage();
+                        String msg = e.getMessage() != null ? e.getMessage() : e.toString();
+
                         if (msg != null && msg.contains("Invalid credentials")) {
-                                return ResponseEntity.status(401).body(java.util.Map.of("message", msg));
+                                return ResponseEntity.status(401)
+                                                .body(java.util.Map.of("message", "Invalid email or password"));
                         }
                         // For connection issues like "Could not open JPA EntityManager", return 500
                         return ResponseEntity.status(500)
