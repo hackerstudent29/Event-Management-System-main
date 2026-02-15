@@ -180,11 +180,9 @@ public class PaymentService {
                 if (token == null || token.isEmpty()) {
                     token = data.optString("token", "");
                 }
-                String paymentUrl = data.optString("paymentUrl");
-                if (paymentUrl == null || paymentUrl.isEmpty()) {
-                    paymentUrl = walletServiceUrl + "/scan?token=" + token;
-                }
-                logger.info("Payment URL generated: {}", paymentUrl);
+                // FORCE REDIRECT to the working scan page I created in this repo
+                String paymentUrl = "https://zendrumbooking.vercel.app/scan?token=" + token;
+                logger.info("Payment URL forced to: {}", paymentUrl);
 
                 response.setPaymentUrl(paymentUrl);
                 response.setTransactionId(data.optString("token", ""));
