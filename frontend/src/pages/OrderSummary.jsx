@@ -54,7 +54,8 @@ export default function OrderSummary() {
                 setCardError(null);
                 try {
                     const [month, year] = cardData.expiry.split('/');
-                    const response = await axios.post('http://localhost:5000/api/external/verify-card', {
+                    const walletApiUrl = import.meta.env.VITE_WALLET_API_URL || 'https://payment-gateway-production-2f82.up.railway.app';
+                    const response = await axios.post(`${walletApiUrl}/api/external/verify-card`, {
                         cardNumber: rawNumber,
                         cvv: cardData.cvv,
                         expiryMonth: month,

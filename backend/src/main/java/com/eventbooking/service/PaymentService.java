@@ -181,7 +181,7 @@ public class PaymentService {
                     token = data.optString("token", "");
                 }
                 // FORCE REDIRECT to the working scan page I created in this repo
-                String paymentUrl = "https://zendrumbooking.vercel.app/scan?token=" + token;
+                String paymentUrl = "https://payment-via-zenwallet.vercel.app/checkout?token=" + token;
                 logger.info("Payment URL forced to: {}", paymentUrl);
 
                 response.setPaymentUrl(paymentUrl);
