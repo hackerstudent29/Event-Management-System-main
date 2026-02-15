@@ -24,6 +24,7 @@ const ScannerPage = lazyRetry(() => import('./pages/ScannerPage'));
 const PublicVerifyPage = lazyRetry(() => import('./pages/PublicVerifyPage'));
 const ZendrumBooking = lazyRetry(() => import('./pages/ZendrumBooking'));
 const PaymentSuccess = lazyRetry(() => import('./pages/PaymentSuccess'));
+const WalletScanPayment = lazyRetry(() => import('./pages/WalletScanPayment'));
 
 const ProtectedRoute = ({ children, role, allowEmail }) => {
   const { user, loading } = useAuth();
@@ -61,6 +62,9 @@ function App() {
                   <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
                   <Route path="/verify-signup-otp" element={<PublicRoute><VerifySignupOtp /></PublicRoute>} />
                   <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+
+                  {/* Wallet Scan Payment Route */}
+                  <Route path="/scan" element={<WalletScanPayment />} />
 
                   {/* Public verify page - no layout */}
                   <Route path="/verify/:bookingId" element={<PublicVerifyPage />} />
