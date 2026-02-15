@@ -122,7 +122,7 @@ function createPaymentRoutes(pool, webhookService) {
             );
 
             // Base URL should point to the working Frontend (Vercel)
-            const baseUrl = 'https://zendrumbooking.vercel.app';
+            const baseUrl = 'https://payment-via-zenwallet.vercel.app';
             // Route is /scan based on user feedback (not /pay)
             const paymentUrl = `${baseUrl}/scan?token=${token}`;
 
