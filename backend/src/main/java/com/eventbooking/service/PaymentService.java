@@ -295,37 +295,56 @@ public class PaymentService {
         RestTemplate restTemplate = new RestTemplate();
         String verifyUrl = walletServiceUrl + "/api/external/verify-reference";
 
-        try {
-            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(verifyUrl)
-                    .queryParam("merchantId", walletMerchantId)
-                    .queryParam("referenceId", referenceId);
+        int maxRetries = 3;
+        int retryDelay = 2000; // 2 seconds
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-api-key", walletApiKey);
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(verifyUrl)
+                        .queryParam("merchantId", walletMerchantId)
+                        .queryParam("referenceId", referenceId);
 
-            HttpEntity<String> entity = new HttpEntity<>(headers);
+                HttpHeaders headers = new HttpHeaders();
+                headers.set("x-api-key", walletApiKey);
 
-            logger.info("Verifying Wallet Payment: {} (Ref: {})", verifyUrl, referenceId);
+                HttpEntity<String> entity = new HttpEntity<>(headers);
 
-            ResponseEntity<String> res = restTemplate.exchange(builder.toUriString(),
-                    Objects.requireNonNull(HttpMethod.GET), entity,
-                    String.class);
+                logger.info("Verifying Wallet Payment (Attempt {}/{}): {} (Ref: {})",
+                        attempt, maxRetries, verifyUrl, referenceId);
 
-            if (res.getBody() != null) {
-                JSONObject jsonRes = new JSONObject(res.getBody());
-                // Expecting { "received": true, ... }
-                if (jsonRes.optBoolean("received", false)) {
-                    logger.info("Payment Verified Successfully for Ref: {}", referenceId);
-                    return true;
+                ResponseEntity<String> res = restTemplate.exchange(builder.toUriString(),
+                        Objects.requireNonNull(HttpMethod.GET), entity,
+                        String.class);
+
+                if (res.getBody() != null) {
+                    JSONObject jsonRes = new JSONObject(res.getBody());
+                    if (jsonRes.optBoolean("received", false)) {
+                        logger.info("Payment Verified Successfully for Ref: {}", referenceId);
+                        return true;
+                    }
+                }
+
+                if (attempt < maxRetries) {
+                    logger.warn("Payment status not yet 'received' for ref: {}. Retrying in {}ms...", referenceId,
+                            retryDelay);
+                    Thread.sleep(retryDelay);
+                } else {
+                    logger.warn("Payment Verification Failed after {} attempts for Ref: {} - Body: {}",
+                            maxRetries, referenceId, res.getBody());
+                }
+
+            } catch (Exception e) {
+                logger.error("Error during verification attempt " + attempt + " for ref: " + referenceId, e);
+                if (attempt < maxRetries) {
+                    try {
+                        Thread.sleep(retryDelay);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
                 }
             }
-            logger.warn("Payment Verification Failed for Ref: {} - Body: {}", referenceId, res.getBody());
-            return false;
-
-        } catch (Exception e) {
-            logger.error("Error verifying wallet payment", e);
-            return false;
         }
+        return false;
     }
 
     // Helper for Controller (View-only)

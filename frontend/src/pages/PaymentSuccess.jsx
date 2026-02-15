@@ -16,8 +16,11 @@ export default function PaymentSuccess() {
 
     useEffect(() => {
         const verifyPayment = async () => {
-            if (paymentStatus === 'success' && referenceId) {
+            // Attempt verification if we have a referenceId, regardless of the status parameter
+            // as the backend verification is the ultimate source of truth.
+            if (referenceId) {
                 try {
+                    setStatus('verifying');
                     // Call Backend to finalize and book
                     const response = await api.post('/payments/finalize-wallet', { referenceId: referenceId });
 
@@ -26,20 +29,21 @@ export default function PaymentSuccess() {
                         setMessage('Your payment was successful and your booking is confirmed!');
                     } else {
                         setStatus('error');
-                        setMessage('Payment verification failed. Please check your wallet.');
+                        setMessage('Payment verification failed or no pending bookings found.');
                     }
                 } catch (error) {
                     console.error("Verification error:", error);
                     setStatus('error');
-                    setMessage(error.response?.data || 'Could not verify payment status. Please contact support.');
+                    const errorMsg = error.response?.data?.message || error.response?.data || 'Could not verify payment status.';
+                    setMessage(errorMsg + ' Please contact support if your money was deducted.');
                 }
             } else if (paymentStatus === 'success') {
-                // If ref is missing but status says success (legacy/direct link?)
+                // If ref is missing but status says success (legacy support)
                 setStatus('success');
                 setMessage('Payment marked successful.');
             } else {
                 setStatus('error');
-                setMessage('Payment failed or was cancelled.');
+                setMessage('Payment failed, was cancelled, or missing reference.');
             }
         };
 
