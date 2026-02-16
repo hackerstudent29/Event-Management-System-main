@@ -1,11 +1,10 @@
 const express = require('express');
 const { generatePaymentId } = require('../utils/crypto');
-const router = express.Router();
-
 /**
  * Create Payment Gateway Routes
  */
 function createPaymentRoutes(pool, webhookService) {
+    const router = express.Router();
 
     // --- V1 ENDPOINTS (Internal/Legacy) ---
 

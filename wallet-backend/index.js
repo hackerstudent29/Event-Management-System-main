@@ -179,28 +179,30 @@ webhookService.startRetryWorker();
 // API Router
 const paymentRouter = createPaymentRoutes(pool, webhookService);
 
-// 1. External API (Multiple prefixes for maximum compatibility/bombproofing)
-// We include both /api/external and /external (root) because some proxies strip the /api prefix
-const externalPaths = ['/api/external', '/external', '/api/v1/external'];
-app.use(externalPaths, authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+// 1. External API (Multiple prefixes for maximum compatibility)
+// This handles:
+// - /api/external/create-request
+// - /external/create-request 
+// - /api/v1/external/create-request
+const externalPrefixes = ['/api/external', '/external', '/api/v1/external'];
+app.use(externalPrefixes, authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
 
-// 2. Legacy/Internal API (v1 format: /api/v1/payments/...)
+// 2. Legacy/Internal API
 app.use('/api/v1/payments', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
 
-// 3. Root Level Catch-all for common external paths if prefix is totally missing
-// Use with caution, but helps with "Cannot POST /external/..."
-app.post('/external/create-request', authenticateApiKey(pool), (req, res, next) => {
-    console.log('[GATEWAY] Root-level POST /external/create-request caught');
-    next();
-}, paymentRouter);
+// DEBUG: Catch-all for any /external request that missed the above (helps diagnose 404s)
+app.all('/external*', (req, res) => {
+    console.warn(`[DEBUG] Unhandled /external request: ${req.method} ${req.url}`);
+    res.status(404).send(`Cannot ${req.method} ${req.url} (DEBUG Catch-all)`);
+});
 
-console.log('[API] Payment Gateway endpoints registered on:', externalPaths);
+console.log('[API] Gateway mounted on:', externalPrefixes);
 
 // --- GO LIVE ---
 
 const server = app.listen(port, () => {
-    console.log(`Wallet App Backend running on http://localhost:${port}`);
-    console.log(`[READY] All routes registered and server is live.`);
+    console.log(`Wallet App Backend running on port ${port}`);
+    console.log(`Ready to process payments...`);
 });
 
 // Setup Socket.IO
