@@ -202,6 +202,13 @@ app.use((req, res, next) => {
     next();
 });
 
+// 2. ABSOLUTE FALLBACK FOR POST (Ensures NO 404 for critical endpoints)
+app.post('/external/create-request', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+app.post('/external/transfer', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+
+// 3. ABSOLUTE FALLBACK FOR GET (Verification)
+app.get('/external/verify-reference', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+
 console.log('[API] Gateway mounted: /external/create-request is now LIVE.');
 
 // --- GO LIVE ---
