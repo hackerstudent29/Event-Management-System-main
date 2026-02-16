@@ -205,8 +205,8 @@ webhookService.startRetryWorker();
 // API Router
 const paymentRouter = createPaymentRoutes(pool, webhookService);
 
-// 1. External API (Guide format: /api/external/...)
-app.use('/api/external', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+// 1. External API (Multiple prefixes for maximum compatibility/bombproofing)
+app.use(['/api/external', '/external'], authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
 
 // 2. Legacy/Internal API (v1 format: /api/v1/payments/...)
 app.use('/api/v1/payments', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);

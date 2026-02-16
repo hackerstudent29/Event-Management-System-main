@@ -121,14 +121,16 @@ public class PaymentService {
                 }
             }
 
-            // 2. Prepare External API Request
-            String createUrl = walletServiceUrl + "/external/create-request";
+            // 2. Prepare External API Request (BOMBPROOF URL CONSTRUCTION)
+            String rawBase = walletServiceUrl.endsWith("/")
+                    ? walletServiceUrl.substring(0, walletServiceUrl.length() - 1)
+                    : walletServiceUrl;
+            String createUrl = rawBase + "/external/create-request";
 
             // Cleanup old pending payments (e.g., > 24 hours) as a maintenance step
             try {
                 pendingPaymentRepository.deleteByCreatedAtBefore(java.time.LocalDateTime.now().minusDays(1));
             } catch (Exception e) {
-                logger.error("Maintenance: Failed to cleanup old pending payments", e);
             }
 
             JSONObject payload = new JSONObject();
@@ -225,7 +227,10 @@ public class PaymentService {
             }
 
             // 2. Call ZenWallet Direct API
-            String transferUrl = walletServiceUrl + "/external/transfer";
+            String baseUrl = walletServiceUrl.endsWith("/")
+                    ? walletServiceUrl.substring(0, walletServiceUrl.length() - 1)
+                    : walletServiceUrl;
+            String transferUrl = baseUrl + "/external/transfer";
 
             JSONObject payload = new JSONObject();
             if (request.getZenWalletUserId() != null) {
@@ -291,8 +296,9 @@ public class PaymentService {
      * Endpoint: GET /api/external/verify-reference
      */
     public boolean finalizeWalletPayment(String referenceId) {
-        RestTemplate restTemplate = new RestTemplate();
-        String verifyUrl = walletServiceUrl + "/external/verify-reference";
+        String baseUrl = walletServiceUrl.endsWith("/") ? walletServiceUrl.substring(0, walletServiceUrl.length() - 1)
+                : walletServiceUrl;
+        String verifyUrl = baseUrl + "/external/verify-reference";
 
         int maxRetries = 3;
         int retryDelay = 2000; // 2 seconds
