@@ -206,12 +206,13 @@ webhookService.startRetryWorker();
 const paymentRouter = createPaymentRoutes(pool, webhookService);
 
 // 1. External API (Multiple prefixes for maximum compatibility/bombproofing)
-app.use(['/api/external', '/external'], authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+const externalPaths = ['/api/external', '/external', '/api/v1/external'];
+app.use(externalPaths, authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
 
 // 2. Legacy/Internal API (v1 format: /api/v1/payments/...)
 app.use('/api/v1/payments', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
 
-console.log('[API] Payment Gateway endpoints registered');
-console.log('  POST /api/external/create-request');
-console.log('  GET  /api/external/verify-reference');
+console.log('[API] Payment Gateway endpoints registered on:', externalPaths);
+console.log('  -> /create-request');
+console.log('  -> /verify-reference');
 console.log('  POST /api/v1/payments/create');
