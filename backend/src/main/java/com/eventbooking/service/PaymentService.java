@@ -296,6 +296,7 @@ public class PaymentService {
      * Endpoint: GET /api/external/verify-reference
      */
     public boolean finalizeWalletPayment(String referenceId) {
+        RestTemplate restTemplate = new RestTemplate();
         String baseUrl = walletServiceUrl.endsWith("/") ? walletServiceUrl.substring(0, walletServiceUrl.length() - 1)
                 : walletServiceUrl;
         String verifyUrl = baseUrl + "/external/verify-reference";
