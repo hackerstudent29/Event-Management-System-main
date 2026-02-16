@@ -164,45 +164,47 @@ app.get('/', (req, res) => {
     });
 });
 
+// --- LOGGING FOR DEBUGGING ---
+app.use((req, res, next) => {
+    if (req.method === 'POST') {
+        console.log(`[POST DEBUG] ${req.method} ${req.url}`);
+    }
+    next();
+});
+
 // ============================================
-// PAYMENT GATEWAY API (REGISTERED BEFORE LISTEN)
+// PAYMENT GATEWAY API (REGISTERED INDIVIDUALLY)
 // ============================================
 
 const { authenticateApiKey, logApiRequest } = require('./middleware/auth');
 const createPaymentRoutes = require('./routes/payments');
 const WebhookService = require('./services/webhook');
 
-// Initialize webhook service
 const webhookService = new WebhookService(pool);
 webhookService.startRetryWorker();
 
-// API Router
+// Create the router
 const paymentRouter = createPaymentRoutes(pool, webhookService);
 
-// 1. External API (Multiple prefixes for maximum compatibility)
-// This handles:
-// - /api/external/create-request
-// - /external/create-request 
-// - /api/v1/external/create-request
-const externalPrefixes = ['/api/external', '/external', '/api/v1/external'];
-app.use(externalPrefixes, authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
-
-// 2. Legacy/Internal API
+// MOUNT EXPLICITLY ON ALL VARIATIONS
+app.use('/api/external', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+app.use('/external', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
 app.use('/api/v1/payments', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+app.use('/api/v1/external', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
 
-// DEBUG: Catch-all for any /external request that missed the above (helps diagnose 404s)
-app.all('/external*', (req, res) => {
-    console.warn(`[DEBUG] Unhandled /external request: ${req.method} ${req.url}`);
-    res.status(404).send(`Cannot ${req.method} ${req.url} (DEBUG Catch-all)`);
+// DEBUG: Catch-all for any POST request that missed the above
+app.post('*', (req, res, next) => {
+    if (res.headersSent) return;
+    console.warn(`[404 WARNING] Unhandled POST request: ${req.url}`);
+    next(); // Pass to default 404
 });
 
-console.log('[API] Gateway mounted on:', externalPrefixes);
+console.log('[API] Gateway mounted on /api/external, /external, and /api/v1/payments');
 
 // --- GO LIVE ---
 
 const server = app.listen(port, () => {
-    console.log(`Wallet App Backend running on port ${port}`);
-    console.log(`Ready to process payments...`);
+    console.log(`Wallet App Backend running on port ${port} (VER: 1.0.3-ULTRA-BOMBPROOF)`);
 });
 
 // Setup Socket.IO
