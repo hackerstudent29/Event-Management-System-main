@@ -551,8 +551,7 @@ export default function OrderSummary() {
                                 <div className="mt-3 pt-3 border-t border-slate-200/50">
                                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Selected Seats</div>
                                     <div className="text-sm font-semibold text-slate-700">
-                                        {bookingPayload.map(b => {
-                                            const seatId = b.seatId || b.seatNumber || '';
+                                        {bookingPayload.flatMap(b => b.seatIds || []).map(seatId => {
                                             return seatId.includes('::') ? seatId.split('::')[1] : seatId;
                                         }).join(', ')}
                                     </div>
