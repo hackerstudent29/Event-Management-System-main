@@ -387,7 +387,7 @@ public class PaymentService {
             try {
                 return Arrays.asList(objectMapper.readValue(p.getBookingPayload(), Dtos.BookingRequest[].class));
             } catch (JsonProcessingException e) {
-                logger.error("Failed to deserialize booking payload from DB", e);
+                logger.error("Failed to deserialize booking payload from DB. Raw: " + p.getBookingPayload(), e);
                 return null;
             }
         }).orElse(Collections.emptyList());
@@ -406,10 +406,14 @@ public class PaymentService {
     @Autowired
     private com.eventbooking.repository.BookingRepository bookingRepository;
 
+    public boolean isPaymentProcessed(String referenceId) {
+        return bookingRepository.existsByPaymentId(referenceId);
+    }
+
     @Transactional
     public boolean processSuccessfulPayment(String referenceId) {
         // Idempotency check: Have we already booked this reference?
-        if (bookingRepository.existsByPaymentId(referenceId)) {
+        if (isPaymentProcessed(referenceId)) {
             logger.info("Payment already processed for reference: {}", referenceId);
             return true;
         }

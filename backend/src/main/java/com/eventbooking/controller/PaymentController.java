@@ -120,12 +120,38 @@ public class PaymentController {
     public ResponseEntity<?> finalizeWalletPayment(@RequestBody Map<String, String> payload) {
         String referenceId = payload.get("referenceId");
 
+        // Detailed Debugging
         try {
-            if (paymentService.processSuccessfulPayment(referenceId)) {
+            // 1. Check Idempotency
+            if (paymentService.isPaymentProcessed(referenceId)) {
                 return ResponseEntity.ok(Collections.singletonMap("success", true));
-            } else {
-                return ResponseEntity.badRequest().body("Payment verification failed or no pending bookings found.");
             }
+
+            // 2. Verify with Wallet Gateway
+            boolean isVerified = paymentService.finalizeWalletPayment(referenceId);
+            if (!isVerified) {
+                logger.error("Payment Verification FAILED for Ref: " + referenceId);
+                return ResponseEntity.badRequest()
+                        .body("Payment verification failed with Gateway. Status not SUCCESS.");
+            }
+
+            // 3. Retrieve Pending Bookings
+            List<Dtos.BookingRequest> requests = paymentService.getPendingBookings(referenceId);
+            if (requests == null || requests.isEmpty()) {
+                logger.error("No Pending Bookings Found for Ref: " + referenceId);
+                return ResponseEntity.badRequest()
+                        .body("Payment confirmed but booking data lost. Contact support (Ref: " + referenceId + ")");
+            }
+
+            // 4. Process Bookings
+            for (Dtos.BookingRequest br : requests) {
+                br.setPaymentId(referenceId);
+                bookingService.bookSeats(br);
+            }
+            paymentService.removePendingBooking(referenceId);
+
+            return ResponseEntity.ok(Collections.singletonMap("success", true));
+
         } catch (Exception e) {
             logger.error("Error finalize booking for ref: " + referenceId, e);
             return ResponseEntity.internalServerError().body("Booking failed: " + e.getMessage());
