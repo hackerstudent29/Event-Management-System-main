@@ -3,9 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import axios from "axios";
-
 import { useMessage } from "../context/MessageContext";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
@@ -17,8 +16,7 @@ const publicApi = axios.create({
     },
 });
 
-// Copied EyeBall component for theme consistency, simplified
-const EyeBall = ({ size = 48, pupilSize = 16, maxDistance = 10, eyeColor = "white", pupilColor = "black" }) => {
+const EyeBall = ({ size = 20, pupilSize = 8, maxDistance = 5 }) => {
     const pupilRef = useRef(null);
     const eyeRef = useRef(null);
 
@@ -50,8 +48,8 @@ const EyeBall = ({ size = 48, pupilSize = 16, maxDistance = 10, eyeColor = "whit
     }, [maxDistance]);
 
     return (
-        <div ref={eyeRef} className="rounded-full flex items-center justify-center" style={{ width: size, height: size, backgroundColor: eyeColor }}>
-            <div ref={pupilRef} className="rounded-full" style={{ width: pupilSize, height: pupilSize, backgroundColor: pupilColor }} />
+        <div ref={eyeRef} className="rounded-full flex items-center justify-center bg-white border border-gray-200" style={{ width: size, height: size }}>
+            <div ref={pupilRef} className="rounded-full bg-black" style={{ width: pupilSize, height: pupilSize }} />
         </div>
     );
 };
@@ -69,7 +67,6 @@ export default function ForgotPassword() {
     const [canResend, setCanResend] = useState(false);
 
     const [error, setError] = useState("");
-    const [message, setMessage] = useState(""); // Add message state too
     const navigate = useNavigate();
 
     // Timer logic
@@ -107,7 +104,6 @@ export default function ForgotPassword() {
         if (e) e.preventDefault();
         setIsLoading(true);
         setError("");
-        setMessage("");
 
         try {
             await publicApi.post('/auth/forgot-password', { email });
@@ -155,8 +151,6 @@ export default function ForgotPassword() {
     const handleResetPassword = async (e) => {
         e.preventDefault();
         try {
-            // We need to pass the OTP here too if the backend requires it for final validation
-            // The previous code passed 'otp', which was a string then. Now it's an array, so join it.
             const otpString = otp.join("");
             await publicApi.post('/auth/reset-password', { email, newPassword, otp: otpString });
             showMessage("Password reset successfully!", { type: 'success' });
@@ -182,10 +176,11 @@ export default function ForgotPassword() {
             <div className="w-full max-w-[420px] space-y-8 bg-card p-8 rounded-2xl shadow-sm border border-border">
                 {/* Header */}
                 <div className="flex flex-col items-center text-center">
-                    <div className="mb-6 relative w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
+                    <div className="mb-6 w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center relative">
+                        {/* Two Eyes */}
                         <div className="flex gap-2">
-                            <EyeBall size={20} pupilSize={8} />
-                            <EyeBall size={20} pupilSize={8} />
+                            <EyeBall size={24} pupilSize={8} />
+                            <EyeBall size={24} pupilSize={8} />
                         </div>
                     </div>
                     <h1 className="text-3xl font-bold tracking-tight">
@@ -228,8 +223,8 @@ export default function ForgotPassword() {
                 )}
 
                 {step === 2 && (
-                    <div className="space-y-6">
-                        <div className="flex justify-center gap-2">
+                    <div className="space-y-8">
+                        <div className="flex justify-between gap-2">
                             {otp.map((digit, idx) => (
                                 <Input
                                     key={idx}
@@ -237,7 +232,7 @@ export default function ForgotPassword() {
                                     value={digit}
                                     onChange={(e) => handleOtpChange(e.target.value, idx)}
                                     onKeyDown={(e) => handleKeyDown(e, idx)}
-                                    className="w-12 h-14 text-center text-xl font-semibold rounded-md border border-input focus:border-primary focus:ring-1 focus:ring-primary shadow-sm"
+                                    className="w-12 h-14 text-center text-xl font-semibold border-2 rounded-xl focus:border-primary focus:ring-0 transition-all bg-background"
                                     maxLength={1}
                                     autoComplete="off"
                                 />
@@ -250,17 +245,17 @@ export default function ForgotPassword() {
                                     Resend code in <span className="font-medium text-foreground">{formatTime(timeLeft)}</span>
                                 </p>
                             ) : (
-                                <Button
-                                    variant="ghost"
+                                <button
+                                    type="button"
                                     onClick={(e) => handleSendOtp(e)}
-                                    className="text-primary hover:text-primary/90"
+                                    className="text-sm font-medium text-primary hover:underline"
                                 >
                                     Resend Code
-                                </Button>
+                                </button>
                             )}
                         </div>
 
-                        <Button onClick={handleVerifyOtp} className="w-full h-12" disabled={isLoading}>
+                        <Button onClick={handleVerifyOtp} className="w-full h-12 text-base font-medium rounded-xl" size="lg" disabled={isLoading}>
                             {isLoading ? "Verifying..." : "Verify Code"}
                         </Button>
                     </div>
