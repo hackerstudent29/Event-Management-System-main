@@ -66,6 +66,8 @@ export default function ForgotPassword() {
     const [timeLeft, setTimeLeft] = useState(60);
     const [canResend, setCanResend] = useState(false);
 
+    const [error, setError] = useState("");
+    const [message, setMessage] = useState(""); // Add message state too
     const navigate = useNavigate();
 
     // Timer logic
@@ -115,7 +117,10 @@ export default function ForgotPassword() {
             setOtp(new Array(6).fill(""));
             setStep(2);
         } catch (err) {
-            showMessage(err.response?.data || "Failed to send OTP", { type: 'error' });
+            console.error("Forgot Password Error:", err);
+            const msg = err.response?.data?.message || err.response?.data || "Failed to send OTP";
+            setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
+            showMessage(typeof msg === 'string' ? msg : "Failed to send OTP", { type: 'error' });
         } finally {
             setIsLoading(false);
         }
@@ -136,7 +141,10 @@ export default function ForgotPassword() {
             await publicApi.post('/auth/verify-otp', { email, otp: otpString });
             setStep(3);
         } catch (err) {
-            showMessage(err.response?.data || "Invalid OTP", { type: 'error' });
+            console.error("Verify Error:", err);
+            const msg = err.response?.data?.message || err.response?.data || "Invalid OTP";
+            setError(typeof msg === 'string' ? msg : "Invalid OTP");
+            showMessage(typeof msg === 'string' ? msg : "Invalid OTP", { type: 'error' });
         } finally {
             setIsLoading(false);
         }
@@ -152,7 +160,10 @@ export default function ForgotPassword() {
             showMessage("Password reset successfully!", { type: 'success' });
             navigate('/login');
         } catch (err) {
-            showMessage(err.response?.data || "Failed to reset password", { type: 'error' });
+            console.error("Reset Error:", err);
+            const msg = err.response?.data?.message || err.response?.data || "Failed to reset password";
+            setError(typeof msg === 'string' ? msg : "Failed to reset password");
+            showMessage(typeof msg === 'string' ? msg : "Failed to reset password", { type: 'error' });
         } finally {
             setIsLoading(false);
         }
@@ -185,6 +196,11 @@ export default function ForgotPassword() {
                         {step === 2 && `We've sent a 6-digit code to ${email}`}
                         {step === 3 && "Create a new strong password."}
                     </p>
+                    {error && (
+                        <div className="mt-4 p-3 w-full bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm font-medium animate-in fade-in slide-in-from-top-1">
+                            {error}
+                        </div>
+                    )}
                 </div>
 
                 {/* Steps */}
