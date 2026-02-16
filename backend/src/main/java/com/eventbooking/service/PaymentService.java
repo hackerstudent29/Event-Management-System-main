@@ -125,6 +125,12 @@ public class PaymentService {
             String rawBase = walletServiceUrl.endsWith("/")
                     ? walletServiceUrl.substring(0, walletServiceUrl.length() - 1)
                     : walletServiceUrl;
+
+            // Fix: Ensure we target the /api context
+            if (!rawBase.endsWith("/api")) {
+                rawBase = rawBase + "/api";
+            }
+
             String createUrl = rawBase + "/external/create-request";
 
             // Cleanup old pending payments (e.g., > 24 hours) as a maintenance step
@@ -230,6 +236,11 @@ public class PaymentService {
             String baseUrl = walletServiceUrl.endsWith("/")
                     ? walletServiceUrl.substring(0, walletServiceUrl.length() - 1)
                     : walletServiceUrl;
+
+            if (!baseUrl.endsWith("/api")) {
+                baseUrl = baseUrl + "/api";
+            }
+
             String transferUrl = baseUrl + "/external/transfer";
 
             JSONObject payload = new JSONObject();
@@ -299,6 +310,11 @@ public class PaymentService {
         RestTemplate restTemplate = new RestTemplate();
         String baseUrl = walletServiceUrl.endsWith("/") ? walletServiceUrl.substring(0, walletServiceUrl.length() - 1)
                 : walletServiceUrl;
+
+        if (!baseUrl.endsWith("/api")) {
+            baseUrl = baseUrl + "/api";
+        }
+
         String verifyUrl = baseUrl + "/external/verify-reference";
 
         int maxRetries = 3;
