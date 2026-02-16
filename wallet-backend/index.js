@@ -167,13 +167,13 @@ app.get('/', (req, res) => {
 // --- LOGGING FOR DEBUGGING ---
 app.use((req, res, next) => {
     if (req.method === 'POST') {
-        console.log(`[POST DEBUG] ${req.method} ${req.url}`);
+        console.log(`[GATEWAY-IN] ${req.method} ${req.url} - Headers: ${JSON.stringify(req.headers['x-api-key'] ? 'Key-Present' : 'Key-Missing')}`);
     }
     next();
 });
 
 // ============================================
-// PAYMENT GATEWAY API (REGISTERED INDIVIDUALLY)
+// PAYMENT GATEWAY API (DIRECT MOUNTING)
 // ============================================
 
 const { authenticateApiKey, logApiRequest } = require('./middleware/auth');
@@ -183,29 +183,35 @@ const WebhookService = require('./services/webhook');
 const webhookService = new WebhookService(pool);
 webhookService.startRetryWorker();
 
-// Create the router
 const paymentRouter = createPaymentRoutes(pool, webhookService);
 
-// MOUNT EXPLICITLY ON ALL VARIATIONS
-app.use('/api/external', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
-app.use('/external', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
-app.use('/api/v1/payments', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
-app.use('/api/v1/external', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+// DIAGNOSTIC PING
+app.get('/external/ping', (req, res) => res.send('GATEWAY_PONG'));
+
+// CRITICAL: Mount create-request at EVERY possible root level to guarantee match
+const gatewaySecretHandlers = [authenticateApiKey(pool), logApiRequest(pool), paymentRouter];
+
+app.use('/api/external', ...gatewaySecretHandlers);
+app.use('/external', ...gatewaySecretHandlers);
+app.use('/api/v1/payments', ...gatewaySecretHandlers);
+
+// EXPLICIT ROOT OVERRIDE (Impossible to miss)
+app.post('/create-request', ...gatewaySecretHandlers);
 
 // DEBUG: Catch-all for any POST request that missed the above
 app.use((req, res, next) => {
     if (req.method === 'POST' && !res.headersSent) {
-        console.warn(`[404 WARNING] Unhandled POST request: ${req.url}`);
+        console.warn(`[404 FINAL] No route matched for: ${req.url}`);
     }
     next();
 });
 
-console.log('[API] Gateway mounted on /api/external, /external, and /api/v1/payments');
+console.log('[API] Gateway mounted with GLOBAL Root Overrides');
 
 // --- GO LIVE ---
 
 const server = app.listen(port, () => {
-    console.log(`Wallet App Backend running on port ${port} (VER: 1.0.3-ULTRA-BOMBPROOF)`);
+    console.log(`Wallet App Backend running on port ${port} (VER: 1.0.4-TOTAL-OVERRIDE)`);
 });
 
 // Setup Socket.IO
