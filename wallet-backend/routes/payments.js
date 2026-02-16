@@ -79,6 +79,59 @@ function createPaymentRoutes(pool, webhookService) {
         }
     });
 
+    /**
+     * POST /:payment_id/confirm
+     * Finalizes the payment status in the Gateway
+     */
+    router.post('/:payment_id/confirm', async (req, res) => {
+        const { payment_id } = req.params;
+        const client = await pool.connect();
+
+        try {
+            await client.query('BEGIN');
+
+            const payRes = await client.query(
+                'SELECT id, amount, status, to_wallet_id FROM payments WHERE payment_id = $1 FOR UPDATE',
+                [payment_id]
+            );
+
+            if (payRes.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ success: false, message: 'Payment session not found' });
+            }
+
+            const payment = payRes.rows[0];
+            if (payment.status !== 'PENDING') {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ success: false, message: 'Payment already processed' });
+            }
+
+            // Update Payment Status
+            await client.query(
+                "UPDATE payments SET status = 'SUCCESS', completed_at = CURRENT_TIMESTAMP WHERE id = $1",
+                [payment.id]
+            );
+
+            // Simulation: Increment merchant balance
+            if (payment.to_wallet_id) {
+                await client.query(
+                    'UPDATE wallets SET balance = balance + $1 WHERE id = $2',
+                    [payment.amount, payment.to_wallet_id]
+                );
+            }
+
+            await client.query('COMMIT');
+            console.log(`[GATEWAY] Payment ${payment_id} CONFIRMED`);
+            res.json({ success: true });
+        } catch (error) {
+            await client.query('ROLLBACK');
+            console.error('Confirm Payment Error:', error);
+            res.status(500).json({ success: false, message: 'Internal Server Error' });
+        } finally {
+            client.release();
+        }
+    });
+
     // --- EXTERNAL ENDPOINTS (Matching ZenWallet Integration Guide) ---
 
     /**

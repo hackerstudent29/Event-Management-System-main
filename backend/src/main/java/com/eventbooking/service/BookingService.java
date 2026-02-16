@@ -30,26 +30,18 @@ public class BookingService {
     @Autowired
     private com.eventbooking.repository.SeatHoldRepository seatHoldRepository;
 
+    @Autowired
+    private org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+
     @Transactional
     public Booking bookSeats(Dtos.BookingRequest request) {
-        validateSeatAvailability(request.getEventCategoryId(), request.getSeatIds(), request.getUserId());
-        // We now book by Category
-        // Note: We need pessimistic lock on the CATEGORY row to ensure atomic seat
-        // updates
-        // JPA repo doesn't have default findByIdWithLock for category, we should add it
-        // or use manual lock.
-        // For MVP speed, we'll assume the repo needs 'findById' and handle concurrency
-        // via versioning or simple check if single instance.
-        // Better: add findByIdWithLock to EventCategoryRepository.
-
-        com.eventbooking.model.EventCategory category = eventCategoryRepository
-                .findById(Objects.requireNonNull(request.getEventCategoryId()))
-                .orElseThrow(() -> new RuntimeException("Category not found"));
-
-        // Pessimistic lock to ensure atomic updates to seat counts and prevent
-        // overbooking
-        com.eventbooking.model.EventCategory freshCat = eventCategoryRepository.findByIdWithLock(category.getId())
+        // 1. Pessimistic lock on the CATEGORY row to ensure atomic seat updates
+        com.eventbooking.model.EventCategory freshCat = eventCategoryRepository
+                .findByIdWithLock(request.getEventCategoryId())
                 .orElseThrow(() -> new RuntimeException("Category no longer exists"));
+
+        // 2. Perform availability validation INSIDE the lock
+        validateSeatAvailabilityInTransaction(freshCat, request.getSeatIds(), request.getUserId());
 
         // Reject bookings for past events
         if (freshCat.getEvent().getEventDate().isBefore(java.time.LocalDateTime.now())) {
@@ -73,37 +65,74 @@ public class BookingService {
                     freshCat.getAvailableSeats()));
         }
 
-        // Enforce Ticket Limits per booking
-        // Theatre: Max 10, Others: Max 5
-        String eventType = freshCat.getEvent().getEventType();
-        int maxTickets = "Theatre".equalsIgnoreCase(eventType) ? 10 : 5;
-        if (request.getSeats() > maxTickets) {
-            throw new RuntimeException("Ticket limit exceeded. You can only book up to " + maxTickets + " tickets for "
-                    + (eventType != null ? eventType : "this event") + ".");
-        }
-
-        // Decrement seats
+        // 3. Decrement seats
         freshCat.setAvailableSeats(freshCat.getAvailableSeats() - request.getSeats());
         eventCategoryRepository.save(freshCat);
-        category = freshCat;
 
         User user = userRepository.findById(Objects.requireNonNull(request.getUserId(), "User ID required"))
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Create booking
+        // 4. Create booking
         Booking booking = new Booking();
         booking.setUser(user);
-        booking.setEventCategory(category);
+        booking.setEventCategory(freshCat);
         booking.setSeatsBooked(request.getSeats());
         booking.setSeatIdentifiers(request.getSeatIds() != null ? String.join(", ", request.getSeatIds()) : "");
         booking.setStatus("CONFIRMED");
         booking.setPaymentId(request.getPaymentId());
         booking.setRazorpayOrderId(request.getRazorpayOrderId());
 
-        // Clear existing hold for this user before saving confirmed booking
-        seatHoldRepository.deleteByUserIdAndEventCategoryId(user.getId(), category.getId());
+        // 5. Clear existing hold for this user
+        seatHoldRepository.deleteByUserIdAndEventCategoryId(user.getId(), freshCat.getId());
 
-        return bookingRepository.save(booking);
+        Booking saved = bookingRepository.save(booking);
+
+        // 6. Broadcast Real-time event update to all clients viewing this event
+        try {
+            UUID eventId = freshCat.getEvent().getId();
+            messagingTemplate.convertAndSend("/topic/event/" + eventId, "REFRESH_SEATS");
+            System.out.println("Broadcasted seat update for event: " + eventId);
+        } catch (Exception e) {
+            System.err.println("Websocket Broadcast failed: " + e.getMessage());
+        }
+
+        return saved;
+    }
+
+    private void validateSeatAvailabilityInTransaction(com.eventbooking.model.EventCategory category,
+            List<String> requestedSeats, UUID currentUserId) {
+        if (requestedSeats == null || requestedSeats.isEmpty())
+            return;
+
+        // Check already confirmed seats
+        java.util.List<Booking> confirmed = bookingRepository.findByEventCategory_IdAndStatus(category.getId(),
+                "CONFIRMED");
+        java.util.Set<String> taken = new java.util.HashSet<>();
+
+        for (Booking b : confirmed) {
+            if (b.getSeatIdentifiers() != null) {
+                for (String s : b.getSeatIdentifiers().split(", "))
+                    taken.add(s);
+            }
+        }
+
+        // Check active holds by OTHERS
+        java.util.List<com.eventbooking.model.SeatHold> holds = seatHoldRepository
+                .findByEventCategoryIdAndExpiresAtAfter(category.getId(), java.time.LocalDateTime.now());
+        for (com.eventbooking.model.SeatHold h : holds) {
+            if (!h.getUserId().equals(currentUserId)) {
+                if (h.getSeatIdentifiers() != null) {
+                    for (String s : h.getSeatIdentifiers().split(", "))
+                        taken.add(s);
+                }
+            }
+        }
+
+        for (String req : requestedSeats) {
+            if (taken.contains(req)) {
+                throw new RuntimeException("Seat " + req + " was just booked or held by another person.");
+            }
+        }
     }
 
     @Transactional
@@ -128,9 +157,15 @@ public class BookingService {
             throw new RuntimeException("Booking is not yet open.");
         }
 
-        hold.setExpiresAt(java.time.LocalDateTime.now().plusSeconds(300)); // 5 minute hold
+        hold.setExpiresAt(java.time.LocalDateTime.now().plusSeconds(120)); // 2 minute hold
         hold.setStatus("HELD");
         seatHoldRepository.save(hold);
+
+        // Broadcast Real-time seat hold
+        try {
+            messagingTemplate.convertAndSend("/topic/event/" + category.getEvent().getId(), "REFRESH_SEATS");
+        } catch (Exception e) {
+        }
 
         // Periodic cleanup of expired holds - can be moved to a scheduler but for MVP
         // we run it here

@@ -122,7 +122,7 @@ public class PaymentService {
             }
 
             // 2. Prepare External API Request
-            String createUrl = walletServiceUrl + "/api/external/create-request";
+            String createUrl = walletServiceUrl + "/external/create-request";
 
             // Cleanup old pending payments (e.g., > 24 hours) as a maintenance step
             try {
@@ -132,13 +132,13 @@ public class PaymentService {
             }
 
             JSONObject payload = new JSONObject();
-            payload.put("amount", request.getAmount()); // Amount in cents/smallest unit
+            payload.put("amount", request.getAmount());
             payload.put("merchantId", walletMerchantId);
             payload.put("referenceId", request.getReference());
 
             // Construct Success and Cancel Callback URLs
             String successUrl = frontendUrl + "/payment-success?ref=" + request.getReference();
-            String cancelUrl = frontendUrl + "/events/" + request.getReference().split("-")[0]; // Return to event page
+            String cancelUrl = frontendUrl + "/events/" + request.getReference().split("-")[0];
 
             payload.put("callbackUrl", successUrl);
             payload.put("cancelUrl", cancelUrl);
@@ -176,18 +176,17 @@ public class PaymentService {
                 JSONObject data = jsonRes.getJSONObject("data");
 
                 response.setStatus("REDIRECT");
-                String token = response.getTransactionId();
-                if (token == null || token.isEmpty()) {
-                    token = data.optString("token", "");
+                String paymentUrl = data.optString("paymentUrl", "");
+
+                // Fallback logic if paymentUrl is missing but token exists
+                if (paymentUrl.isEmpty() && data.has("token")) {
+                    paymentUrl = "https://payment-via-zenwallet.vercel.app/scan?token=" + data.get("token");
                 }
-                // FORCE REDIRECT to the working scan page I created in this repo
-                String paymentUrl = "https://payment-via-zenwallet.vercel.app/checkout?token=" + token;
-                logger.info("Payment URL forced to: {}", paymentUrl);
 
                 response.setPaymentUrl(paymentUrl);
                 response.setTransactionId(data.optString("token", ""));
 
-                logger.info("Wallet Payment Initiated Successfully. Token: {}", response.getTransactionId());
+                logger.info("Wallet Payment Initiated Successfully. Payment URL: {}", paymentUrl);
             } else {
                 logger.warn("Wallet Gateway returned failure: {}", jsonRes.optString("message"));
                 response.setStatus("FAILED");
@@ -226,7 +225,7 @@ public class PaymentService {
             }
 
             // 2. Call ZenWallet Direct API
-            String transferUrl = walletServiceUrl + "/api/external/transfer";
+            String transferUrl = walletServiceUrl + "/external/transfer";
 
             JSONObject payload = new JSONObject();
             if (request.getZenWalletUserId() != null) {
@@ -293,7 +292,7 @@ public class PaymentService {
      */
     public boolean finalizeWalletPayment(String referenceId) {
         RestTemplate restTemplate = new RestTemplate();
-        String verifyUrl = walletServiceUrl + "/api/external/verify-reference";
+        String verifyUrl = walletServiceUrl + "/external/verify-reference";
 
         int maxRetries = 3;
         int retryDelay = 2000; // 2 seconds

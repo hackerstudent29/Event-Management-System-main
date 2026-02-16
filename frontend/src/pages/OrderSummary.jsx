@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CreditCard, MapPin, Ticket, ChevronLeft, Calendar as CalendarIcon, Clock } from "lucide-react";
 import api from '../api/axios';
@@ -15,6 +15,7 @@ export default function OrderSummary() {
     const { user } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const state = location.state || {};
     const { event, bookingPayload, purchasedItems } = state;
 
@@ -24,7 +25,7 @@ export default function OrderSummary() {
     const [referenceId] = useState(crypto.randomUUID().slice(0, 8).toUpperCase()); // Short readable ref
     const [walletStatus, setWalletStatus] = useState('idle'); // idle, verifying
     const { showMessage } = useMessage();
-    const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
+    const [timeLeft, setTimeLeft] = useState(120); // 2 minutes in seconds
     const [cardData, setCardData] = useState({
         number: '',
         name: '',
@@ -42,6 +43,13 @@ export default function OrderSummary() {
     const convenienceFee = totalQty > 0 ? (30.00 + Math.max(0, totalQty - 1) * 15.00) : 0;
     const gstAmount = Number((convenienceFee * 0.18).toFixed(2));
     const totalAmount = ticketPrice + convenienceFee + gstAmount;
+
+    useEffect(() => {
+        const status = searchParams.get('payment_status');
+        if (status === 'cancelled') {
+            showMessage("Payment was cancelled. You can try another method.", { type: 'info' });
+        }
+    }, [searchParams, showMessage]);
 
     React.useEffect(() => {
         const verifyCardDetails = async () => {

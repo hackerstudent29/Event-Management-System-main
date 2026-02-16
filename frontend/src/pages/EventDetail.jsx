@@ -4,6 +4,8 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { SeatSelection } from '@/components/ui/seat-selection';
 import { useMessage } from '../context/MessageContext';
+import SockJS from 'sockjs-client';
+import { Client } from '@stomp/stompjs';
 import { Map, Marker, MapRoute } from '@/components/ui/map';
 import {
     Navigation, Car, Bike, Footprints, Bus,
@@ -97,10 +99,41 @@ const EventDetail = () => {
         if (!event?.categories) return;
 
         fetchAllOccupied();
-        // Refresh every 30 seconds for live updates
-        const interval = setInterval(fetchAllOccupied, 30000);
-        return () => clearInterval(interval);
-    }, [event?.categories, fetchAllOccupied]);
+
+        // 1. WebSocket (STOMP) Real-time Subscription
+        const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8085';
+        const wsUrl = backendUrl.replace('/api', '').replace('http', 'ws') + '/ws-payment';
+
+        const stompClient = new Client({
+            webSocketFactory: () => new SockJS(backendUrl.replace('/api', '') + '/ws-payment'),
+            debug: (str) => {
+                // console.log("[STOMP-SEATS] " + str);
+            },
+            reconnectDelay: 5000,
+            heartbeatIncoming: 4000,
+            heartbeatOutgoing: 4000,
+        });
+
+        stompClient.onConnect = (frame) => {
+            console.log("Connected to Real-time Seat Updates");
+            stompClient.subscribe("/topic/event/" + id, (message) => {
+                if (message.body === "REFRESH_SEATS") {
+                    console.log("Real-time Refresh Triggered");
+                    fetchAllOccupied();
+                }
+            });
+        };
+
+        stompClient.activate();
+
+        // 2. Fallback Interval (every 60s instead of 30s)
+        const interval = setInterval(fetchAllOccupied, 60000);
+
+        return () => {
+            clearInterval(interval);
+            if (stompClient.active) stompClient.deactivate();
+        };
+    }, [event?.categories, fetchAllOccupied, id]);
 
     // 1.6 Fetch User Saved Locations
     useEffect(() => {

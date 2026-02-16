@@ -42,28 +42,31 @@ const WalletScanPayment = () => {
     const handleConfirm = async () => {
         setProcessing(true);
         try {
-            // SIMULATE PAYMENT SUCCESS
-            // In a real app, this would call /api/external/transfer or similar.
-            // Here we assume the user confirms and the backend eventually verifies it.
-            // Since we don't have a direct "Confirm Payment" endpoint exposed (it's server-to-server), 
-            // we will simulate the delay and redirect to success.
-
-            // Note: Ensuring the backend actually sees it as success requires the "Mock" logic 
-            // or an actual transfer. For this fix, we prioritize the UI flow.
+            // ACTUALLY UPDATE THE DATABASE STATUS
+            await axios.post(`${WALLET_API_URL}/api/v1/payments/${token}/confirm`);
 
             setTimeout(() => {
                 // Redirect to payment success page with reference
-                // This matches the callback URL expected by the booking system
                 if (paymentDetails?.reference) {
-                    window.location.href = `/payment-success?ref=${paymentDetails.reference}`;
+                    window.location.href = `/payment-success?ref=${paymentDetails.reference}&status=success`;
                 } else {
                     navigate('/');
                 }
-            }, 1500);
+            }, 1000);
 
         } catch (err) {
-            setError("Payment failed.");
+            console.error("Confirmation Error:", err);
+            setError(err.response?.data?.message || "Payment confirmation failed.");
             setProcessing(false);
+        }
+    };
+
+    const handleCancel = () => {
+        if (paymentDetails?.reference) {
+            // Redirect back to order summary with status canceled
+            window.location.href = `/order-summary?payment_status=cancelled&ref=${paymentDetails.reference}`;
+        } else {
+            navigate('/');
         }
     };
 
@@ -122,7 +125,7 @@ const WalletScanPayment = () => {
                     </Button>
 
                     <button
-                        onClick={() => navigate('/')}
+                        onClick={handleCancel}
                         className="w-full mt-6 text-slate-500 hover:text-white text-sm font-medium transition-colors"
                     >
                         Cancel Transaction
