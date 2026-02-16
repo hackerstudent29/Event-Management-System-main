@@ -140,9 +140,19 @@ export default function OrderSummary() {
 
 
     React.useEffect(() => {
-        // Initialize STOMP connection
-        const backendUrl = import.meta.env.VITE_API_BASE_URL || 'https://zendrum-backend.onrender.com/api';
-        const wsUrl = backendUrl.replace('/api', '/ws-payment');
+        // BOMBPROOF URL SELECTION
+        const backendBase = import.meta.env.VITE_API_BASE_URL || 'https://event-booking-backend-production-05bd.up.railway.app';
+
+        // Ensure we don't have double /api or missing /api
+        const cleanBase = backendBase.endsWith('/api') ? backendBase : `${backendBase}/api`;
+        const wsUrl = cleanBase.replace('/api', '/ws-payment');
+
+        console.log("[STOMP] Attempting connection to:", wsUrl);
+
+        if (!wsUrl || wsUrl.includes('undefined')) {
+            console.error("[STOMP] Invalid WebSocket URL detected. Check VITE_API_BASE_URL env var.");
+            return;
+        }
 
         const stompClient = new Client({
             webSocketFactory: () => new SockJS(wsUrl),

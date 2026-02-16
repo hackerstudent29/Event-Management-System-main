@@ -173,7 +173,7 @@ app.use((req, res, next) => {
 });
 
 // ============================================
-// PAYMENT GATEWAY API (DIRECT MOUNTING)
+// FINAL SOLUTION: BOMBPROOF GLOBAL ROUTING
 // ============================================
 
 const { authenticateApiKey, logApiRequest } = require('./middleware/auth');
@@ -183,35 +183,34 @@ const WebhookService = require('./services/webhook');
 const webhookService = new WebhookService(pool);
 webhookService.startRetryWorker();
 
+// API Router
 const paymentRouter = createPaymentRoutes(pool, webhookService);
 
-// DIAGNOSTIC PING
-app.get('/external/ping', (req, res) => res.send('GATEWAY_PONG'));
+// 1. GLOBAL MOUNT (Top priority)
+// This captures: /external/create-request, /api/external/create-request, etc.
+const gatewayHandlers = [authenticateApiKey(pool), logApiRequest(pool), paymentRouter];
 
-// CRITICAL: Mount create-request at EVERY possible root level to guarantee match
-const gatewaySecretHandlers = [authenticateApiKey(pool), logApiRequest(pool), paymentRouter];
+app.use('/external', ...gatewayHandlers);
+app.use('/api/external', ...gatewayHandlers);
+app.use('/api/v1/payments', ...gatewayHandlers);
 
-app.use('/api/external', ...gatewaySecretHandlers);
-app.use('/external', ...gatewaySecretHandlers);
-app.use('/api/v1/payments', ...gatewaySecretHandlers);
+// 2. ABSOLUTE FALLBACK FOR POST (Ensures NO 404 for create-request)
+app.post('/external/create-request', ...gatewayHandlers);
 
-// EXPLICIT ROOT OVERRIDE (Impossible to miss)
-app.post('/create-request', ...gatewaySecretHandlers);
-
-// DEBUG: Catch-all for any POST request that missed the above
+// DEBUG LOGGING
 app.use((req, res, next) => {
-    if (req.method === 'POST' && !res.headersSent) {
-        console.warn(`[404 FINAL] No route matched for: ${req.url}`);
+    if (req.method === 'POST') {
+        console.log(`[GATEWAY] Root Logger saw: ${req.method} ${req.url}`);
     }
     next();
 });
 
-console.log('[API] Gateway mounted with GLOBAL Root Overrides');
+console.log('[API] Gateway successfully mounted on all possible paths.');
 
 // --- GO LIVE ---
 
 const server = app.listen(port, () => {
-    console.log(`Wallet App Backend running on port ${port} (VER: 1.0.4-TOTAL-OVERRIDE)`);
+    console.log(`Wallet App Backend running on port ${port} (VER: 1.0.5-FINAL-MATCH)`);
 });
 
 // Setup Socket.IO
