@@ -119,10 +119,14 @@ public class EmailService {
                         title, bodyText, otp);
 
                 helper.setText(Objects.requireNonNull(htmlContent), true);
+
+                System.out.println("Attempting to send email via host: "
+                        + System.getProperty("spring.mail.host", "configured-host"));
                 mailSender.send(message);
+                System.out.println("EMAIL SENT SUCCESSFULLY to " + to);
 
             } catch (Exception e) {
-                System.err.println("FAILED TO SEND EMAIL ASYNC: " + e.getMessage());
+                System.err.println("FAILED TO SEND EMAIL ASYNC to " + to + ": " + e.getMessage());
                 e.printStackTrace();
             }
         }); // End Async
