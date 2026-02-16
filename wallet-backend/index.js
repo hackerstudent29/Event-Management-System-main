@@ -164,10 +164,43 @@ app.get('/', (req, res) => {
     });
 });
 
+// ============================================
+// PAYMENT GATEWAY API (REGISTERED BEFORE LISTEN)
+// ============================================
+
+const { authenticateApiKey, logApiRequest } = require('./middleware/auth');
+const createPaymentRoutes = require('./routes/payments');
+const WebhookService = require('./services/webhook');
+
+// Initialize webhook service
+const webhookService = new WebhookService(pool);
+webhookService.startRetryWorker();
+
+// API Router
+const paymentRouter = createPaymentRoutes(pool, webhookService);
+
+// 1. External API (Multiple prefixes for maximum compatibility/bombproofing)
+// We include both /api/external and /external (root) because some proxies strip the /api prefix
+const externalPaths = ['/api/external', '/external', '/api/v1/external'];
+app.use(externalPaths, authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+
+// 2. Legacy/Internal API (v1 format: /api/v1/payments/...)
+app.use('/api/v1/payments', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+
+// 3. Root Level Catch-all for common external paths if prefix is totally missing
+// Use with caution, but helps with "Cannot POST /external/..."
+app.post('/external/create-request', authenticateApiKey(pool), (req, res, next) => {
+    console.log('[GATEWAY] Root-level POST /external/create-request caught');
+    next();
+}, paymentRouter);
+
+console.log('[API] Payment Gateway endpoints registered on:', externalPaths);
+
 // --- GO LIVE ---
 
 const server = app.listen(port, () => {
     console.log(`Wallet App Backend running on http://localhost:${port}`);
+    console.log(`[READY] All routes registered and server is live.`);
 });
 
 // Setup Socket.IO
@@ -189,30 +222,3 @@ io.on('connection', (socket) => {
 });
 
 app.set('socketio', io);
-
-// ============================================
-// PAYMENT GATEWAY API
-// ============================================
-
-const { authenticateApiKey, logApiRequest } = require('./middleware/auth');
-const createPaymentRoutes = require('./routes/payments');
-const WebhookService = require('./services/webhook');
-
-// Initialize webhook service
-const webhookService = new WebhookService(pool);
-webhookService.startRetryWorker();
-
-// API Router
-const paymentRouter = createPaymentRoutes(pool, webhookService);
-
-// 1. External API (Multiple prefixes for maximum compatibility/bombproofing)
-const externalPaths = ['/api/external', '/external', '/api/v1/external'];
-app.use(externalPaths, authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
-
-// 2. Legacy/Internal API (v1 format: /api/v1/payments/...)
-app.use('/api/v1/payments', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
-
-console.log('[API] Payment Gateway endpoints registered on:', externalPaths);
-console.log('  -> /create-request');
-console.log('  -> /verify-reference');
-console.log('  POST /api/v1/payments/create');
