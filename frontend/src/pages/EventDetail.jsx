@@ -213,13 +213,14 @@ const EventDetail = () => {
 
             const response = await fetch('https://overpass-api.de/api/interpreter', {
                 method: 'POST',
-                body: `data=${encodeURIComponent(query)}`
+                body: `data=${encodeURIComponent(query)}`,
+                signal: AbortSignal.timeout(5000) // 5s client-side timeout
             });
 
             if (!response.ok) {
-                // Silently fail on timeout/server error to not alarm user
-                if (response.status !== 504 && response.status !== 503) {
-                    console.warn(`Overpass API info result: ${response.status}`);
+                // Silently handle 504/503 errors
+                if (response.status === 504 || response.status === 503) {
+                    console.warn(`[MAP] Overpass API Timeout (${response.status}) - Amenities skipped to prevent lag.`);
                 }
                 return;
             }
