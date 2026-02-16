@@ -368,45 +368,7 @@ export default function OrderSummary() {
 
                             </label>
 
-                            {/* UPI Option */}
-                            <label className={cn("relative flex flex-col p-6 cursor-pointer transition-colors", paymentMethod === 'upi' ? "bg-blue-50/10" : "hover:bg-slate-50")}>
-                                <div className="flex items-center gap-4">
-                                    <input
-                                        type="radio"
-                                        name="payment"
-                                        value="upi"
-                                        checked={paymentMethod === 'upi'}
-                                        onChange={() => setPaymentMethod('upi')}
-                                        className="w-5 h-5 text-slate-900 border-slate-300 focus:ring-slate-900"
-                                    />
-                                    <div className="flex-1">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-bold text-slate-900">UPI</span>
-                                            <div className="flex gap-2 opacity-80 grayscale transition-all data-[state=active]:grayscale-0" data-state={paymentMethod === 'upi' ? 'active' : ''}>
-                                                {/* Simple CSS Icons or SVGs for GPay/PhonePe placeholders */}
-                                                <div className="h-5 w-8 bg-slate-200 rounded"></div>
-                                                <div className="h-5 w-8 bg-slate-200 rounded"></div>
-                                                <div className="h-5 w-8 bg-slate-200 rounded"></div>
-                                            </div>
-                                        </div>
-                                        <p className="text-sm text-slate-500 mt-1">Google Pay, PhonePe, Paytm, BHIM</p>
-                                    </div>
-                                </div>
 
-                                {/* Expanded State for UPI */}
-                                {paymentMethod === 'upi' && (
-                                    <div className="mt-4 ml-9 animate-in slide-in-from-top-2 fade-in duration-200">
-                                        <div className="p-4 bg-white border border-slate-200 rounded-xl">
-                                            <p className="text-sm text-slate-600 mb-3">Pay securely with any UPI app</p>
-                                            <div className="flex gap-3">
-                                                <button className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">Google Pay</button>
-                                                <button className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">PhonePe</button>
-                                                <button className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">Paytm</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </label>
 
                             {/* Card Option */}
                             <label className={cn("relative flex flex-col p-6 cursor-pointer transition-colors", paymentMethod === 'card' ? "bg-blue-50/10" : "hover:bg-slate-50")}>
