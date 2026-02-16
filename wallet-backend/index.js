@@ -173,7 +173,7 @@ app.use((req, res, next) => {
 });
 
 // ============================================
-// FINAL SOLUTION: BOMBPROOF GLOBAL ROUTING
+// FINAL SOLUTION: EXPLICIT GLOBAL ROUTING
 // ============================================
 
 const { authenticateApiKey, logApiRequest } = require('./middleware/auth');
@@ -186,31 +186,28 @@ webhookService.startRetryWorker();
 // API Router
 const paymentRouter = createPaymentRoutes(pool, webhookService);
 
-// 1. GLOBAL MOUNT (Top priority)
-// This captures: /external/create-request, /api/external/create-request, etc.
-const gatewayHandlers = [authenticateApiKey(pool), logApiRequest(pool), paymentRouter];
+// 1. Root Level Routing (Bypasses all sub-router masking issues)
+// Mount the core gateway logic at /external and /api/external
+app.use('/external', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
+app.use('/api/external', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
 
-app.use('/external', ...gatewayHandlers);
-app.use('/api/external', ...gatewayHandlers);
-app.use('/api/v1/payments', ...gatewayHandlers);
-
-// 2. ABSOLUTE FALLBACK FOR POST (Ensures NO 404 for create-request)
-app.post('/external/create-request', ...gatewayHandlers);
+// 2. Legacy/Internal
+app.use('/api/v1/payments', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
 
 // DEBUG LOGGING
 app.use((req, res, next) => {
     if (req.method === 'POST') {
-        console.log(`[GATEWAY] Root Logger saw: ${req.method} ${req.url}`);
+        console.log(`[GATEWAY-TRAFFIC] ${req.method} ${req.url}`);
     }
     next();
 });
 
-console.log('[API] Gateway successfully mounted on all possible paths.');
+console.log('[API] Gateway mounted: /external/create-request is now LIVE.');
 
 // --- GO LIVE ---
 
 const server = app.listen(port, () => {
-    console.log(`Wallet App Backend running on port ${port} (VER: 1.0.5-FINAL-MATCH)`);
+    console.log(`Wallet App Backend running on port ${port} (VER: 1.0.6-STRICT-MATCH)`);
 });
 
 // Setup Socket.IO
