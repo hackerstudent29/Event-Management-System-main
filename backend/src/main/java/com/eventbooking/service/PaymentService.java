@@ -428,6 +428,9 @@ public class PaymentService {
     }
 
     @Autowired
+    private com.eventbooking.repository.SeatHoldRepository seatHoldRepository;
+
+    @Autowired
     private BookingService bookingService;
 
     @Autowired
