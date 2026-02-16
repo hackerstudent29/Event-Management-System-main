@@ -193,10 +193,11 @@ app.use('/api/v1/payments', authenticateApiKey(pool), logApiRequest(pool), payme
 app.use('/api/v1/external', authenticateApiKey(pool), logApiRequest(pool), paymentRouter);
 
 // DEBUG: Catch-all for any POST request that missed the above
-app.post('*', (req, res, next) => {
-    if (res.headersSent) return;
-    console.warn(`[404 WARNING] Unhandled POST request: ${req.url}`);
-    next(); // Pass to default 404
+app.use((req, res, next) => {
+    if (req.method === 'POST' && !res.headersSent) {
+        console.warn(`[404 WARNING] Unhandled POST request: ${req.url}`);
+    }
+    next();
 });
 
 console.log('[API] Gateway mounted on /api/external, /external, and /api/v1/payments');
