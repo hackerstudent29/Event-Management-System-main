@@ -390,7 +390,34 @@ public class PaymentService {
                 logger.error("Failed to deserialize booking payload from DB. Raw: " + p.getBookingPayload(), e);
                 return null;
             }
-        }).orElse(Collections.emptyList());
+        }).orElseGet(() -> {
+            // ULTIMATE FALLBACK: Reconstruct from Active Seat Holds
+            logger.warn("PendingPayment record lost for Ref: {}. Attempting to reconstruct from SeatHolds...",
+                    referenceId);
+
+            // Find holds with this reference ID (we set this in prepareHoldsForPayment)
+            List<com.eventbooking.model.SeatHold> holds = seatHoldRepository.findAll().stream()
+                    .filter(h -> referenceId.equals(h.getReferenceId()))
+                    .collect(java.util.stream.Collectors.toList());
+
+            if (holds.isEmpty()) {
+                logger.error("CRITICAL: No SeatHolds found for Ref: " + referenceId);
+                return Collections.emptyList();
+            }
+
+            // Map holds back to BookingRequests
+            return holds.stream().map(h -> {
+                Dtos.BookingRequest req = new Dtos.BookingRequest();
+                req.setUserId(h.getUserId());
+                req.setEventCategoryId(h.getEventCategoryId());
+                req.setSeatIds(Arrays.asList(h.getSeatIdentifiers().split(", ")));
+                req.setSeats(req.getSeatIds().size());
+                req.setPaymentId(referenceId);
+                // Note: Amount is not strictly needed for the booking record itself, just seat
+                // allocation
+                return req;
+            }).collect(java.util.stream.Collectors.toList());
+        });
     }
 
     public void removePendingBooking(String referenceId) {
