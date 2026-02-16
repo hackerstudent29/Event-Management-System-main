@@ -18,7 +18,7 @@ public class User {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    @Column(nullable = true)
+    @Column(name = "full_name", nullable = false)
     private String name;
 
     @Column(nullable = false, unique = true)
