@@ -109,6 +109,9 @@ const Profile = () => {
         promotionalEmails: true
     });
 
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
     // Feature States
     const [showAddLocationModal, setShowAddLocationModal] = useState(false);
     const [newLocationLabel, setNewLocationLabel] = useState('Home');
@@ -297,6 +300,10 @@ const Profile = () => {
         navigate('/login');
     };
 
+    const confirmLogout = () => {
+        setShowLogoutConfirm(true);
+    };
+
     const closePasswordModal = () => {
         setShowChangePasswordModal(false);
         setOtpSent(false);
@@ -305,7 +312,6 @@ const Profile = () => {
     }
 
     const handleDeleteAccount = async () => {
-        if (!window.confirm("Are you sure you want to delete your account? This action is permanent.")) return;
         try {
             await api.delete(`/users/${user.id}`);
             showMessage("Account deleted successfully", { type: 'success' });
@@ -314,6 +320,10 @@ const Profile = () => {
         } catch (err) {
             showMessage("Failed to delete account", { type: 'error' });
         }
+    };
+
+    const confirmDeleteAccount = () => {
+        setShowDeleteConfirm(true);
     };
 
     const handleAddLocation = async () => {
@@ -604,7 +614,7 @@ const Profile = () => {
                             <Button variant="outline" className="w-full justify-start gap-2 text-slate-700" onClick={() => setShowChangePasswordModal(true)}>
                                 <Lock className="w-4 h-4" /> Change Password
                             </Button>
-                            <Button variant="ghost" className="w-full justify-start gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 mt-2" onClick={handleLogout}>
+                            <Button variant="ghost" className="w-full justify-start gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 mt-2" onClick={confirmLogout}>
                                 <LogOut className="w-4 h-4" /> Sign Out
                             </Button>
                         </div>
@@ -823,8 +833,8 @@ const Profile = () => {
                                                 <SectionTitle icon={MapPin}>Saved Locations</SectionTitle>
                                                 <p className="text-xs text-slate-500 font-medium -mt-3">Save locations for faster route calculation.</p>
                                             </div>
-                                            <Button size="sm" className="gap-2 bg-slate-900 hover:bg-slate-800 shadow-lg" onClick={() => setShowAddLocationModal(true)}>
-                                                <Plus className="w-4 h-4" /> Add Location
+                                            <Button variant="destructive" className="w-full gap-2 bg-red-600 hover:bg-red-700" onClick={confirmDeleteAccount}>
+                                                <Trash2 className="w-4 h-4" /> Delete Account Permanently
                                             </Button>
                                         </div>
 
@@ -962,7 +972,7 @@ const Profile = () => {
                                                     <h4 className="text-sm font-bold text-red-900">Permanently Delete Account</h4>
                                                     <p className="text-xs text-red-600/70">Warning: All your bookings and data will be erased forever</p>
                                                 </div>
-                                                <Button variant="ghost" size="sm" className="h-9 px-4 text-xs font-bold text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-200" onClick={handleDeleteAccount}>
+                                                <Button variant="ghost" size="sm" className="h-9 px-4 text-xs font-bold text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-200" onClick={confirmDeleteAccount}>
                                                     Delete Account
                                                 </Button>
                                             </div>
@@ -1110,6 +1120,33 @@ const Profile = () => {
                             )}
                         </AnimatePresence>
                     </div>
+                    {showDeleteConfirm && (
+                        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowDeleteConfirm(false)} />
+                            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white rounded-2xl p-6 shadow-2xl w-full max-w-sm border border-slate-200">
+                                <h3 className="text-lg font-bold text-red-600 mb-2">Delete Account?</h3>
+                                <p className="text-sm text-slate-600 mb-6">This action cannot be undone. All your data will be permanently deleted.</p>
+                                <div className="flex gap-3">
+                                    <Button variant="outline" className="flex-1" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
+                                    <Button variant="destructive" className="flex-1 bg-red-600 hover:bg-red-700" onClick={handleDeleteAccount}>Delete</Button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+
+                    {showLogoutConfirm && (
+                        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowLogoutConfirm(false)} />
+                            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white rounded-2xl p-6 shadow-2xl w-full max-w-sm border border-slate-200">
+                                <h3 className="text-lg font-bold text-slate-900 mb-2">Sign Out?</h3>
+                                <p className="text-sm text-slate-600 mb-6">Are you sure you want to sign out of your account?</p>
+                                <div className="flex gap-3">
+                                    <Button variant="outline" className="flex-1" onClick={() => setShowLogoutConfirm(false)}>Cancel</Button>
+                                    <Button className="flex-1 bg-slate-900 text-white hover:bg-slate-800" onClick={handleLogout}>Sign Out</Button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
