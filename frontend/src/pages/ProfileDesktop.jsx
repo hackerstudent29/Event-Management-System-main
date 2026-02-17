@@ -666,6 +666,7 @@ const ProfileDesktop = () => {
                                                                 <p className="text-xs font-bold text-slate-400 mt-1">₹{((booking.seatsBooked * booking.eventCategory?.price) + 35.40).toLocaleString()}</p>
                                                             </div>
                                                             {booking.status === 'CONFIRMED' && (
+                                                                <div className="flex gap-2">
                                                                     <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-slate-500 hover:text-primary rounded-full hover:bg-slate-100" title="View Invoice" onClick={() => navigate(`/ticket/${booking.id}?view=invoice`)}>
                                                                         <FileText className="w-4 h-4" />
                                                                     </Button>
@@ -674,342 +675,348 @@ const ProfileDesktop = () => {
                                                                     </Button>
                                                                 </div>
                                                             )}
-                                                    </div>
-                                                </div>
-                                                </div>
-                                    ))
-                                        )}
-                                </div>
-                                </motion.div>
-                            )}
-
-                        {activeTab === 'payments' && (
-                            <motion.div
-                                key="payments"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden"
-                            >
-                                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                                    <SectionTitle icon={CreditCard}>Invoices & Transactions</SectionTitle>
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead>
-                                            <tr className="bg-slate-50/50">
-                                                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Date</th>
-                                                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">ID</th>
-                                                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Amount</th>
-                                                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Status</th>
-                                                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Invoice</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {paginatedPayments.map(booking => (
-                                                <tr key={booking.id} className="hover:bg-slate-50/30 transition-colors">
-                                                    <td className="px-6 py-4 text-sm text-slate-600 font-medium">
-                                                        {booking.bookingTime ? new Date(booking.bookingTime).toLocaleDateString() : 'N/A'}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-sm font-mono text-slate-400">
-                                                        #{booking.id.toString().slice(0, 8).toUpperCase()}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-sm font-bold text-slate-900">
-                                                        ₹{((booking.seatsBooked * (booking.eventCategory?.price || 0)) + 35.40).toLocaleString()}
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-1.5">
-                                                            {booking.status === 'CONFIRMED' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <XCircle className="w-3.5 h-3.5 text-red-500" />}
-                                                            <span className={cn("text-[10px] font-bold uppercase", booking.status === 'CONFIRMED' ? "text-emerald-600" : "text-red-600")}>
-                                                                {booking.status}
-                                                            </span>
                                                         </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        <Button variant="ghost" size="sm" className="h-8 px-2 text-primary gap-1" onClick={() => navigate(`/ticket/${booking.id}?view=invoice`)}>
-                                                            <Download className="w-3.5 h-3.5" /> PDF
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <Pagination
-                                    totalItems={bookings.length}
-                                    itemsPerPage={ITEMS_PER_PAGE}
-                                    currentPage={paymentsPage}
-                                    onPageChange={setPaymentsPage}
-                                />
-                            </motion.div>
-                        )}
-
-                        {activeTab === 'locations' && (
-                            <motion.div
-                                key="locations"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="space-y-6"
-                            >
-                                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                                    <div className="flex items-center justify-between mb-8">
-                                        <div>
-                                            <SectionTitle icon={MapPin}>Saved Locations</SectionTitle>
-                                            <p className="text-xs text-slate-500 font-medium -mt-3">Save locations for faster route calculation.</p>
-                                        </div>
-                                        <Button size="sm" className="gap-2 bg-slate-900 hover:bg-slate-800 shadow-lg" onClick={() => setShowAddLocationModal(true)}>
-                                            <Plus className="w-4 h-4" /> Add Location
-                                        </Button>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {locations.length === 0 ? (
-                                            <div className="md:col-span-2 py-12 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                                                <MapPin className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                                                <p className="text-slate-500 text-sm font-medium">No saved locations yet.</p>
-                                            </div>
-                                        ) : (
-                                            locations.map(loc => (
-                                                <div key={loc.id} className="relative group overflow-hidden bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-all">
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
-                                                            <MapPin className="w-5 h-5" />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <h4 className="font-bold text-slate-900 group-hover:text-primary transition-colors">{loc.label}</h4>
-                                                            <p className="text-xs text-slate-500 truncate leading-relaxed">{loc.address}</p>
-                                                        </div>
-                                                        <button
-                                                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                                            onClick={() => handleDeleteLocation(loc.id)}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                    {/* Live Preview Map */}
-                                                    <div className="mt-4 h-24 bg-slate-100 rounded-lg border border-slate-100 overflow-hidden relative group-hover:shadow-inner transition-all">
-                                                        <Map
-                                                            initialViewState={{
-                                                                latitude: loc.latitude || 20.5937,
-                                                                longitude: loc.longitude || 78.9629,
-                                                                zoom: 14
-                                                            }}
-                                                            interactive={false}
-                                                            className="w-full h-full"
-                                                        >
-                                                            <Marker
-                                                                latitude={loc.latitude || 20.5937}
-                                                                longitude={loc.longitude || 78.9629}
-                                                            />
-                                                        </Map>
                                                     </div>
                                                 </div>
                                             ))
                                         )}
+                                        <Pagination
+                                            totalItems={filteredBookings.length}
+                                            itemsPerPage={ITEMS_PER_PAGE}
+                                            currentPage={bookingsPage}
+                                            onPageChange={setBookingsPage}
+                                        />
                                     </div>
-                                </div>
-                            </motion.div>
-                        )}
+                                </motion.div>
+                            )}
 
-                        {activeTab === 'settings' && (
-                            <motion.div
-                                key="settings"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="space-y-6"
-                            >
-                                {/* Communication Preferences */}
-                                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                                    <SectionTitle icon={Bell}>Communication Preferences</SectionTitle>
-                                    <div className="space-y-4">
-                                        {[
-                                            { id: 'bookingConfirmations', title: 'Booking Confirmations', desc: 'Get SMS & Email when you book an event' },
-                                            { id: 'eventReminders', title: 'Event Reminders', desc: 'Receive alerts 24h before your event starts' },
-                                            { id: 'cancellationUpdates', title: 'Cancellation Updates', desc: 'Immediate alerts if an event is postponed or cancelled' },
-                                            { id: 'promotionalEmails', title: 'Promotional Emails', desc: 'New events, discounts and curated recommendations' }
-                                        ].map(pref => (
-                                            <div key={pref.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors">
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-slate-900">{pref.title}</h4>
-                                                    <p className="text-xs text-slate-500">{pref.desc}</p>
-                                                </div>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={preferences[pref.id]}
-                                                    onChange={(e) => handlePreferenceChange(pref.id, e.target.checked)}
-                                                    className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer transition-all active:scale-95"
-                                                />
-                                            </div>
-                                        ))}
+                            {activeTab === 'payments' && (
+                                <motion.div
+                                    key="payments"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden"
+                                >
+                                    <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                                        <SectionTitle icon={CreditCard}>Invoices & Transactions</SectionTitle>
                                     </div>
-                                    <div className="mt-8 pt-6 border-t border-slate-100">
-                                        <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">
-                                            * You can turn off these notifications at any time via these website settings. Required transactional alerts like security OTPs will still be sent for your safety.
-                                        </p>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50/50">
+                                                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Date</th>
+                                                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">ID</th>
+                                                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Amount</th>
+                                                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                                                    <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Invoice</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {paginatedPayments.map(booking => (
+                                                    <tr key={booking.id} className="hover:bg-slate-50/30 transition-colors">
+                                                        <td className="px-6 py-4 text-sm text-slate-600 font-medium">
+                                                            {booking.bookingTime ? new Date(booking.bookingTime).toLocaleDateString() : 'N/A'}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm font-mono text-slate-400">
+                                                            #{booking.id.toString().slice(0, 8).toUpperCase()}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm font-bold text-slate-900">
+                                                            ₹{((booking.seatsBooked * (booking.eventCategory?.price || 0)) + 35.40).toLocaleString()}
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-1.5">
+                                                                {booking.status === 'CONFIRMED' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <XCircle className="w-3.5 h-3.5 text-red-500" />}
+                                                                <span className={cn("text-[10px] font-bold uppercase", booking.status === 'CONFIRMED' ? "text-emerald-600" : "text-red-600")}>
+                                                                    {booking.status}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <Button variant="ghost" size="sm" className="h-8 px-2 text-primary gap-1" onClick={() => navigate(`/ticket/${booking.id}?view=invoice`)}>
+                                                                <Download className="w-3.5 h-3.5" /> PDF
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
-                                </div>
+                                    <Pagination
+                                        totalItems={bookings.length}
+                                        itemsPerPage={ITEMS_PER_PAGE}
+                                        currentPage={paymentsPage}
+                                        onPageChange={setPaymentsPage}
+                                    />
+                                </motion.div>
+                            )}
 
-                                {/* Security & Danger Zone */}
-                                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                                    <SectionTitle icon={ShieldCheck}>Security & account control</SectionTitle>
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between p-4 bg-red-50/30 rounded-xl border border-red-100">
+                            {activeTab === 'locations' && (
+                                <motion.div
+                                    key="locations"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    className="space-y-6"
+                                >
+                                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                                        <div className="flex items-center justify-between mb-8">
                                             <div>
-                                                <h4 className="text-sm font-bold text-red-900">Permanently Delete Account</h4>
-                                                <p className="text-xs text-red-600/70">Warning: All your bookings and data will be erased forever</p>
+                                                <SectionTitle icon={MapPin}>Saved Locations</SectionTitle>
+                                                <p className="text-xs text-slate-500 font-medium -mt-3">Save locations for faster route calculation.</p>
                                             </div>
-                                            <Button variant="ghost" size="sm" className="h-9 px-4 text-xs font-bold text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-200" onClick={() => setShowDeleteAccountModal(true)}>
-                                                Delete Account
+                                            <Button size="sm" className="gap-2 bg-slate-900 hover:bg-slate-800 shadow-lg" onClick={() => setShowAddLocationModal(true)}>
+                                                <Plus className="w-4 h-4" /> Add Location
                                             </Button>
                                         </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
 
-                        {activeTab === 'help-center' && (
-                            <motion.div key="help-center" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm space-y-8">
-                                <button onClick={() => setActiveTab('support')} className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary transition-colors mb-4">
-                                    <ChevronRight className="w-4 h-4 rotate-180" /> Back to Support Menu
-                                </button>
-                                <SectionTitle icon={HelpCircle}>Help Center</SectionTitle>
-                                <div className="space-y-6">
-                                    <div>
-                                        <h4 className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4 flex items-center gap-2"><Ticket className="w-4 h-4 text-slate-400" /> Booking & Tickets</h4>
-                                        <div className="space-y-4">
-                                            <div><p className="font-semibold text-sm text-slate-800">Q: Where can I find my ticket after booking?</p><p className="text-sm text-slate-500 mt-1">A: Go to <strong>My Bookings → Open Ticket</strong>. You can also download or email your ticket.</p></div>
-                                            <div><p className="font-semibold text-sm text-slate-800">Q: Can I book multiple tickets in one booking?</p><p className="text-sm text-slate-500 mt-1">A: Yes, you can book multiple seats in a single booking, subject to availability.</p></div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4 text-slate-400" /> Payments & Fees</h4>
-                                        <div className="space-y-4">
-                                            <div><p className="font-semibold text-sm text-slate-800">Q: Is GST applied on ticket price?</p><p className="text-sm text-slate-500 mt-1">A: No. GST is applied only on the convenience fee as per Indian tax rules.</p></div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4 flex items-center gap-2"><XCircle className="w-4 h-4 text-slate-400" /> Cancellations & Refunds</h4>
-                                        <div className="space-y-4">
-                                            <div><p className="font-semibold text-sm text-slate-800">Q: What happens if an event is cancelled?</p><p className="text-sm text-slate-500 mt-1">A: You will receive a cancellation email and an automatic refund to your original payment method.</p></div>
-                                            <div><p className="font-semibold text-sm text-slate-800">Q: How long does a refund take?</p><p className="text-sm text-slate-500 mt-1">A: Refunds are usually processed within <strong>5–7 business days</strong>.</p></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-
-                        {activeTab === 'support' && (
-                            <motion.div key="support" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
-                                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-                                    <SectionTitle icon={HelpCircle}>Support & Help</SectionTitle>
-                                    <p className="text-slate-600 mb-6">Choose from the options below to get help with your account, bookings, or technical issues.</p>
-
-                                    <div className="grid md:grid-cols-2 gap-4">
-                                        {[
-                                            { id: 'help-center', label: 'Help Center', desc: 'Browse FAQs and common questions', icon: HelpCircle },
-                                            { id: 'contact', label: 'Contact Support', desc: 'Get in touch with our support team', icon: Mail },
-                                            { id: 'terms', label: 'Terms & Privacy', desc: 'View our policies and terms', icon: ShieldCheck },
-                                            { id: 'report', label: 'Report a Problem', desc: 'Report technical issues or bugs', icon: AlertCircle }
-                                        ].map(option => (
-                                            <button
-                                                key={option.id}
-                                                onClick={() => setActiveTab(option.id)}
-                                                className="group p-6 bg-white border border-slate-200 rounded-xl hover:border-primary hover:shadow-md transition-all text-left"
-                                            >
-                                                <div className="flex items-start gap-4">
-                                                    <div className="w-12 h-12 rounded-lg bg-primary/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
-                                                        <option.icon className="w-6 h-6" />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <h3 className="font-bold text-slate-900 group-hover:text-primary transition-colors mb-1">{option.label}</h3>
-                                                        <p className="text-sm text-slate-500">{option.desc}</p>
-                                                    </div>
-                                                    <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors" />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {locations.length === 0 ? (
+                                                <div className="md:col-span-2 py-12 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                                    <MapPin className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                                                    <p className="text-slate-500 text-sm font-medium">No saved locations yet.</p>
                                                 </div>
-                                            </button>
-                                        ))}
+                                            ) : (
+                                                locations.map(loc => (
+                                                    <div key={loc.id} className="relative group overflow-hidden bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-all">
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                                                                <MapPin className="w-5 h-5" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <h4 className="font-bold text-slate-900 group-hover:text-primary transition-colors">{loc.label}</h4>
+                                                                <p className="text-xs text-slate-500 truncate leading-relaxed">{loc.address}</p>
+                                                            </div>
+                                                            <button
+                                                                className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                                onClick={() => handleDeleteLocation(loc.id)}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                        {/* Live Preview Map */}
+                                                        <div className="mt-4 h-24 bg-slate-100 rounded-lg border border-slate-100 overflow-hidden relative group-hover:shadow-inner transition-all">
+                                                            <Map
+                                                                initialViewState={{
+                                                                    latitude: loc.latitude || 20.5937,
+                                                                    longitude: loc.longitude || 78.9629,
+                                                                    zoom: 14
+                                                                }}
+                                                                interactive={false}
+                                                                className="w-full h-full"
+                                                            >
+                                                                <Marker
+                                                                    latitude={loc.latitude || 20.5937}
+                                                                    longitude={loc.longitude || 78.9629}
+                                                                />
+                                                            </Map>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            </motion.div>
-                        )}
+                                </motion.div>
+                            )}
 
-                        {activeTab === 'contact' && (
-                            <motion.div key="contact" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-                                <button onClick={() => setActiveTab('support')} className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary transition-colors mb-4">
-                                    <ChevronRight className="w-4 h-4 rotate-180" /> Back to Support Menu
-                                </button>
-                                <SectionTitle icon={HelpCircle}>Contact Support</SectionTitle>
-                                <h2 className="text-xl font-bold text-slate-900 mb-2">We’re here to help</h2>
-                                <p className="text-slate-600 mb-6">If you’re facing issues with bookings, payments, tickets, or account access, our support team is ready to assist you.</p>
-                                <div className="grid md:grid-cols-2 gap-8">
-                                    <div>
-                                        <h4 className="font-semibold text-slate-900 mb-3">Available support:</h4>
-                                        <ul className="space-y-2 text-sm text-slate-600 list-disc list-inside">
-                                            <li>Booking & ticket issues</li>
-                                            <li>Payment or refund queries</li>
-                                            <li>Event cancellations</li>
-                                            <li>Account & login problems</li>
-                                            <li>Technical errors</li>
-                                        </ul>
+                            {activeTab === 'settings' && (
+                                <motion.div
+                                    key="settings"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    className="space-y-6"
+                                >
+                                    {/* Communication Preferences */}
+                                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                                        <SectionTitle icon={Bell}>Communication Preferences</SectionTitle>
+                                        <div className="space-y-4">
+                                            {[
+                                                { id: 'bookingConfirmations', title: 'Booking Confirmations', desc: 'Get SMS & Email when you book an event' },
+                                                { id: 'eventReminders', title: 'Event Reminders', desc: 'Receive alerts 24h before your event starts' },
+                                                { id: 'cancellationUpdates', title: 'Cancellation Updates', desc: 'Immediate alerts if an event is postponed or cancelled' },
+                                                { id: 'promotionalEmails', title: 'Promotional Emails', desc: 'New events, discounts and curated recommendations' }
+                                            ].map(pref => (
+                                                <div key={pref.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors">
+                                                    <div>
+                                                        <h4 className="text-sm font-bold text-slate-900">{pref.title}</h4>
+                                                        <p className="text-xs text-slate-500">{pref.desc}</p>
+                                                    </div>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={preferences[pref.id]}
+                                                        onChange={(e) => handlePreferenceChange(pref.id, e.target.checked)}
+                                                        className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer transition-all active:scale-95"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="mt-8 pt-6 border-t border-slate-100">
+                                            <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">
+                                                * You can turn off these notifications at any time via these website settings. Required transactional alerts like security OTPs will still be sent for your safety.
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="bg-slate-50 p-4 rounded-xl space-y-3 border border-slate-100">
-                                        <div className="flex items-center gap-3 text-sm"><Mail className="w-5 h-5 text-primary" /><span className="font-medium text-slate-900">eventbooking.otp@gmail.com</span></div>
-                                        <div className="flex items-center gap-3 text-sm"><Clock className="w-5 h-5 text-slate-400" /><span className="text-slate-600">9:00 AM – 7:00 PM (IST)</span></div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
 
-                        {activeTab === 'terms' && (
-                            <motion.div key="terms" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-                                <button onClick={() => setActiveTab('support')} className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary transition-colors mb-4">
-                                    <ChevronRight className="w-4 h-4 rotate-180" /> Back to Support Menu
-                                </button>
-                                <div className="grid md:grid-cols-2 gap-8">
-                                    <div>
-                                        <SectionTitle icon={ShieldCheck}>Terms of Service</SectionTitle>
-                                        <ul className="space-y-2 text-sm text-slate-600 list-disc list-inside mt-4">
-                                            <li>Follow event rules set by organizers</li>
-                                            <li>Provide accurate booking details</li>
-                                            <li>Use tickets responsibly</li>
-                                            <li>Not misuse or resell tickets</li>
-                                        </ul>
-                                        <p className="text-xs text-slate-400 mt-4 italic">Tickets are subject to availability and organizer policies.</p>
+                                    {/* Security & Danger Zone */}
+                                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                                        <SectionTitle icon={ShieldCheck}>Security & account control</SectionTitle>
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between p-4 bg-red-50/30 rounded-xl border border-red-100">
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-red-900">Permanently Delete Account</h4>
+                                                    <p className="text-xs text-red-600/70">Warning: All your bookings and data will be erased forever</p>
+                                                </div>
+                                                <Button variant="ghost" size="sm" className="h-9 px-4 text-xs font-bold text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-200" onClick={() => setShowDeleteAccountModal(true)}>
+                                                    Delete Account
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <SectionTitle icon={Lock}>Privacy Policy</SectionTitle>
-                                        <p className="text-sm text-slate-600 mt-4 mb-2">We respect your privacy. We collect name, email, phone number, and booking details.</p>
-                                        <p className="text-sm text-slate-600">We do <strong>NOT</strong> sell or share your personal data with third parties, except where required for payment processing or legal compliance.</p>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
+                                </motion.div>
+                            )}
 
-                        {activeTab === 'report' && (
-                            <motion.div key="report" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-slate-900 rounded-2xl p-8 shadow-lg text-white">
-                                <button onClick={() => setActiveTab('support')} className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors mb-4">
-                                    <ChevronRight className="w-4 h-4 rotate-180" /> Back to Support Menu
-                                </button>
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-bold flex items-center gap-2 mb-2"><span className="bg-white/20 p-1.5 rounded-lg"><CheckCircle2 className="w-5 h-5" /></span>Report a Problem</h3>
-                                        <p className="text-slate-300 text-sm mb-6 max-w-lg">Facing an issue? Let us know about booking failures, payment issues, or technical bugs.</p>
+                            {activeTab === 'help-center' && (
+                                <motion.div key="help-center" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm space-y-8">
+                                    <button onClick={() => setActiveTab('support')} className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary transition-colors mb-4">
+                                        <ChevronRight className="w-4 h-4 rotate-180" /> Back to Support Menu
+                                    </button>
+                                    <SectionTitle icon={HelpCircle}>Help Center</SectionTitle>
+                                    <div className="space-y-6">
+                                        <div>
+                                            <h4 className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4 flex items-center gap-2"><Ticket className="w-4 h-4 text-slate-400" /> Booking & Tickets</h4>
+                                            <div className="space-y-4">
+                                                <div><p className="font-semibold text-sm text-slate-800">Q: Where can I find my ticket after booking?</p><p className="text-sm text-slate-500 mt-1">A: Go to <strong>My Bookings → Open Ticket</strong>. You can also download or email your ticket.</p></div>
+                                                <div><p className="font-semibold text-sm text-slate-800">Q: Can I book multiple tickets in one booking?</p><p className="text-sm text-slate-500 mt-1">A: Yes, you can book multiple seats in a single booking, subject to availability.</p></div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4 text-slate-400" /> Payments & Fees</h4>
+                                            <div className="space-y-4">
+                                                <div><p className="font-semibold text-sm text-slate-800">Q: Is GST applied on ticket price?</p><p className="text-sm text-slate-500 mt-1">A: No. GST is applied only on the convenience fee as per Indian tax rules.</p></div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4 flex items-center gap-2"><XCircle className="w-4 h-4 text-slate-400" /> Cancellations & Refunds</h4>
+                                            <div className="space-y-4">
+                                                <div><p className="font-semibold text-sm text-slate-800">Q: What happens if an event is cancelled?</p><p className="text-sm text-slate-500 mt-1">A: You will receive a cancellation email and an automatic refund to your original payment method.</p></div>
+                                                <div><p className="font-semibold text-sm text-slate-800">Q: How long does a refund take?</p><p className="text-sm text-slate-500 mt-1">A: Refunds are usually processed within <strong>5–7 business days</strong>.</p></div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-                                    <div className="grid md:grid-cols-3 gap-6">
-                                        <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Contact Email</label><p className="font-mono text-sm">eventbooking.otp@gmail.com</p></div>
-                                        <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Response Time</label><p className="text-sm">Within 24 hours</p></div>
+                                </motion.div>
+                            )}
+
+                            {activeTab === 'support' && (
+                                <motion.div key="support" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                                    <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+                                        <SectionTitle icon={HelpCircle}>Support & Help</SectionTitle>
+                                        <p className="text-slate-600 mb-6">Choose from the options below to get help with your account, bookings, or technical issues.</p>
+
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                            {[
+                                                { id: 'help-center', label: 'Help Center', desc: 'Browse FAQs and common questions', icon: HelpCircle },
+                                                { id: 'contact', label: 'Contact Support', desc: 'Get in touch with our support team', icon: Mail },
+                                                { id: 'terms', label: 'Terms & Privacy', desc: 'View our policies and terms', icon: ShieldCheck },
+                                                { id: 'report', label: 'Report a Problem', desc: 'Report technical issues or bugs', icon: AlertCircle }
+                                            ].map(option => (
+                                                <button
+                                                    key={option.id}
+                                                    onClick={() => setActiveTab(option.id)}
+                                                    className="group p-6 bg-white border border-slate-200 rounded-xl hover:border-primary hover:shadow-md transition-all text-left"
+                                                >
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="w-12 h-12 rounded-lg bg-primary/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                                                            <option.icon className="w-6 h-6" />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <h3 className="font-bold text-slate-900 group-hover:text-primary transition-colors mb-1">{option.label}</h3>
+                                                            <p className="text-sm text-slate-500">{option.desc}</p>
+                                                        </div>
+                                                        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors" />
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                                </motion.div>
+                            )}
+
+                            {activeTab === 'contact' && (
+                                <motion.div key="contact" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+                                    <button onClick={() => setActiveTab('support')} className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary transition-colors mb-4">
+                                        <ChevronRight className="w-4 h-4 rotate-180" /> Back to Support Menu
+                                    </button>
+                                    <SectionTitle icon={HelpCircle}>Contact Support</SectionTitle>
+                                    <h2 className="text-xl font-bold text-slate-900 mb-2">We’re here to help</h2>
+                                    <p className="text-slate-600 mb-6">If you’re facing issues with bookings, payments, tickets, or account access, our support team is ready to assist you.</p>
+                                    <div className="grid md:grid-cols-2 gap-8">
+                                        <div>
+                                            <h4 className="font-semibold text-slate-900 mb-3">Available support:</h4>
+                                            <ul className="space-y-2 text-sm text-slate-600 list-disc list-inside">
+                                                <li>Booking & ticket issues</li>
+                                                <li>Payment or refund queries</li>
+                                                <li>Event cancellations</li>
+                                                <li>Account & login problems</li>
+                                                <li>Technical errors</li>
+                                            </ul>
+                                        </div>
+                                        <div className="bg-slate-50 p-4 rounded-xl space-y-3 border border-slate-100">
+                                            <div className="flex items-center gap-3 text-sm"><Mail className="w-5 h-5 text-primary" /><span className="font-medium text-slate-900">eventbooking.otp@gmail.com</span></div>
+                                            <div className="flex items-center gap-3 text-sm"><Clock className="w-5 h-5 text-slate-400" /><span className="text-slate-600">9:00 AM – 7:00 PM (IST)</span></div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {activeTab === 'terms' && (
+                                <motion.div key="terms" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+                                    <button onClick={() => setActiveTab('support')} className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary transition-colors mb-4">
+                                        <ChevronRight className="w-4 h-4 rotate-180" /> Back to Support Menu
+                                    </button>
+                                    <div className="grid md:grid-cols-2 gap-8">
+                                        <div>
+                                            <SectionTitle icon={ShieldCheck}>Terms of Service</SectionTitle>
+                                            <ul className="space-y-2 text-sm text-slate-600 list-disc list-inside mt-4">
+                                                <li>Follow event rules set by organizers</li>
+                                                <li>Provide accurate booking details</li>
+                                                <li>Use tickets responsibly</li>
+                                                <li>Not misuse or resell tickets</li>
+                                            </ul>
+                                            <p className="text-xs text-slate-400 mt-4 italic">Tickets are subject to availability and organizer policies.</p>
+                                        </div>
+                                        <div>
+                                            <SectionTitle icon={Lock}>Privacy Policy</SectionTitle>
+                                            <p className="text-sm text-slate-600 mt-4 mb-2">We respect your privacy. We collect name, email, phone number, and booking details.</p>
+                                            <p className="text-sm text-slate-600">We do <strong>NOT</strong> sell or share your personal data with third parties, except where required for payment processing or legal compliance.</p>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {activeTab === 'report' && (
+                                <motion.div key="report" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-slate-900 rounded-2xl p-8 shadow-lg text-white">
+                                    <button onClick={() => setActiveTab('support')} className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors mb-4">
+                                        <ChevronRight className="w-4 h-4 rotate-180" /> Back to Support Menu
+                                    </button>
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <h3 className="text-lg font-bold flex items-center gap-2 mb-2"><span className="bg-white/20 p-1.5 rounded-lg"><CheckCircle2 className="w-5 h-5" /></span>Report a Problem</h3>
+                                            <p className="text-slate-300 text-sm mb-6 max-w-lg">Facing an issue? Let us know about booking failures, payment issues, or technical bugs.</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+                                        <div className="grid md:grid-cols-3 gap-6">
+                                            <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Contact Email</label><p className="font-mono text-sm">eventbooking.otp@gmail.com</p></div>
+                                            <div className="space-y-1"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Response Time</label><p className="text-sm">Within 24 hours</p></div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
                 </div>
             </div>
-        </div>
         </div >
     );
 };
