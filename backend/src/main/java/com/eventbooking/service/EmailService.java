@@ -19,8 +19,24 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String senderEmail;
 
-    @Value("${spring.mail.host}")
+    @Value("${spring.mail.host:smtp-relay.brevo.com}")
     private String mailHost;
+
+    @Value("${spring.mail.port:587}")
+    private int mailPort;
+
+    @jakarta.annotation.PostConstruct
+    public void testConnection() {
+        System.out.println("---------- SMTP CONNECTIVITY TEST START ----------");
+        System.out.println("Testing connection to: " + mailHost + ":" + mailPort);
+        try (java.net.Socket socket = new java.net.Socket()) {
+            socket.connect(new java.net.InetSocketAddress(mailHost, mailPort), 5000);
+            System.out.println("SUCCESS: Connected to " + mailHost + ":" + mailPort);
+        } catch (Exception e) {
+            System.err.println("FAILURE: Could not connect to " + mailHost + ":" + mailPort + " - " + e.getMessage());
+        }
+        System.out.println("---------- SMTP CONNECTIVITY TEST END ----------");
+    }
 
     public void sendHtmlOtp(String to, String otp, String purpose) {
         // Log OTP to console for development/debugging
