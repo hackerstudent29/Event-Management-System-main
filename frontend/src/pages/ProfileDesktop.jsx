@@ -59,6 +59,12 @@ const ProfileDesktop = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('bookings'); // bookings, payments, locations, settings
     const [bookingFilter, setBookingFilter] = useState('all'); // all, confirmed, cancelled
+    const [preferences, setPreferences] = useState({
+        bookingConfirmations: true,
+        eventReminders: true,
+        cancellationUpdates: true,
+        promotionalEmails: true
+    });
 
     // Feature States
     const [showAddLocationModal, setShowAddLocationModal] = useState(false);
@@ -114,16 +120,18 @@ const ProfileDesktop = () => {
 
     const fetchData = useCallback(async () => {
         try {
-            const [userRes, statsRes, bookingsRes, locationsRes] = await Promise.all([
+            const [userRes, statsRes, bookingsRes, locationsRes, prefsRes] = await Promise.all([
                 api.get(`/users/profile/${user.id}`),
                 api.get(`/users/stats/${user.id}`),
                 api.get('/bookings/my'),
-                api.get(`/users/locations/${user.id}`)
+                api.get(`/users/locations/${user.id}`),
+                api.get('/user/preferences')
             ]);
             setFullUser(userRes.data);
             setStats(statsRes.data);
             setBookings(bookingsRes.data);
             setLocations(locationsRes.data);
+            setPreferences(prefsRes.data);
 
             // Pre-fill edit form
             setEditName(userRes.data.name || '');
@@ -249,6 +257,19 @@ const ProfileDesktop = () => {
             fetchData();
         } catch (err) {
             showMessage("Failed to delete location", { type: 'error' });
+        }
+    };
+
+    const handlePreferenceChange = async (key, value) => {
+        const newPrefs = { ...preferences, [key]: value };
+        setPreferences(newPrefs);
+        try {
+            await api.put('/user/preferences', newPrefs);
+            showMessage("Preferences updated", { type: 'success' });
+        } catch (err) {
+            showMessage("Failed to update preferences", { type: 'error' });
+            // Revert on failure
+            setPreferences(preferences);
         }
     };
 
@@ -732,19 +753,29 @@ const ProfileDesktop = () => {
                                         <SectionTitle icon={Bell}>Communication Preferences</SectionTitle>
                                         <div className="space-y-4">
                                             {[
-                                                { id: 'conf', title: 'Booking Confirmations', desc: 'Get SMS & Email when you book an event' },
-                                                { id: 'rem', title: 'Event Reminders', desc: 'Receive alerts 24h before your event starts' },
-                                                { id: 'canc', title: 'Cancellation Updates', desc: 'Immediate alerts if an event is postponed or cancelled' },
-                                                { id: 'promo', title: 'Promotional Emails', desc: 'New events, discounts and curated recommendations' }
+                                                { id: 'bookingConfirmations', title: 'Booking Confirmations', desc: 'Get SMS & Email when you book an event' },
+                                                { id: 'eventReminders', title: 'Event Reminders', desc: 'Receive alerts 24h before your event starts' },
+                                                { id: 'cancellationUpdates', title: 'Cancellation Updates', desc: 'Immediate alerts if an event is postponed or cancelled' },
+                                                { id: 'promotionalEmails', title: 'Promotional Emails', desc: 'New events, discounts and curated recommendations' }
                                             ].map(pref => (
                                                 <div key={pref.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors">
                                                     <div>
                                                         <h4 className="text-sm font-bold text-slate-900">{pref.title}</h4>
                                                         <p className="text-xs text-slate-500">{pref.desc}</p>
                                                     </div>
-                                                    <input type="checkbox" defaultChecked className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary h-5 w-5" />
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={preferences[pref.id]}
+                                                        onChange={(e) => handlePreferenceChange(pref.id, e.target.checked)}
+                                                        className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer transition-all active:scale-95"
+                                                    />
                                                 </div>
                                             ))}
+                                        </div>
+                                        <div className="mt-8 pt-6 border-t border-slate-100">
+                                            <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">
+                                                * You can turn off these notifications at any time via these website settings. Required transactional alerts like security OTPs will still be sent for your safety.
+                                            </p>
                                         </div>
                                     </div>
 

@@ -29,7 +29,7 @@ const ProfileMobile = () => {
         bookingConfirmations: true,
         eventReminders: true,
         cancellationUpdates: true,
-        promotionalEmails: false
+        promotionalEmails: true
     });
 
     useEffect(() => {
@@ -264,6 +264,11 @@ const ProfileMobile = () => {
                                         }`}
                                 />
                             </button>
+                        </div>
+                        <div className="mt-6 pt-4 border-t border-slate-100">
+                            <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">
+                                * You can turn off these notifications at any time. Required transactional alerts like security OTPs will still be sent for your safety.
+                            </p>
                         </div>
                     </div>
                 </div>

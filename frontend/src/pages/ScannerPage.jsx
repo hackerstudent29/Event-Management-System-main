@@ -7,6 +7,7 @@ import { CheckCircle2, XCircle, AlertTriangle, ArrowLeft, MapPin, User } from 'l
 import { useNavigate } from 'react-router-dom';
 
 const ScannerPage = () => {
+    console.log('Premium Scanner v1.0.2 Loaded');
     const navigate = useNavigate();
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
