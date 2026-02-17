@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Ticket, Mail, Calendar, MapPin, FileText, ChevronLeft } from 'lucide-react';
+import { Ticket, Mail, Calendar, MapPin, FileText, ChevronLeft, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LocationMap } from '@/components/ui/expand-map';
 import { getDefaultEventImage } from '../lib/image-utils';
@@ -13,6 +13,14 @@ const MyBookingsDesktop = () => {
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [emailingId, setEmailingId] = useState(null);
+    const [collapsedIds, setCollapsedIds] = useState({});
+
+    const toggleCollapse = (id) => {
+        setCollapsedIds(prev => ({
+            ...prev,
+            [id]: !prev[id]
+        }));
+    };
 
     useEffect(() => {
         if (!user) {
@@ -169,10 +177,15 @@ const MyBookingsDesktop = () => {
                             const { event, bookings: groupBookings } = group;
                             const isAllCancelled = groupBookings.every(b => b.status === 'CANCELLED');
 
+                            const isCollapsed = collapsedIds[event.id];
+
                             return (
                                 <div key={event.id} className={`bg-white border rounded-2xl overflow-hidden transition-all duration-200 
                                                ${isAllCancelled ? 'border-slate-100 opacity-75' : 'border-slate-200 shadow-sm hover:shadow-md'}`}>
-                                    <div className="flex flex-col md:flex-row border-b border-slate-100 bg-slate-50/50">
+                                    <div
+                                        onClick={() => toggleCollapse(event.id)}
+                                        className="flex flex-col md:flex-row border-b border-slate-100 bg-slate-50/50 cursor-pointer hover:bg-slate-100/50 transition-colors group/header"
+                                    >
                                         <div className="w-full md:w-20 aspect-square md:aspect-auto p-0 flex shrink-0 overflow-hidden">
                                             <img
                                                 src={event.imageUrl || getDefaultEventImage(event.eventType)}
@@ -195,61 +208,68 @@ const MyBookingsDesktop = () => {
                                             </span>
                                         </div>
                                         <div className="p-5 flex-1 flex flex-col justify-center">
-                                            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                                {event.name}
-                                                {isAllCancelled && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded uppercase">Cancelled</span>}
-                                            </h3>
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                                    {event.name}
+                                                    {isAllCancelled && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded uppercase">Cancelled</span>}
+                                                </h3>
+                                                <div className="text-slate-400 group-hover/header:text-slate-600 transition-colors">
+                                                    {isCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                                                </div>
+                                            </div>
                                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 mt-1">
                                                 <div className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 opacity-60" />{event.eventDate ? new Date(event.eventDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBA'}</div>
                                                 <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 opacity-60" />{event.locationName || event.eventType}</div>
                                             </div>
                                         </div>
-                                        {(event.locationName || event.latitude || event.longitude) && (
-                                            <div className="p-5 border-l border-slate-100 flex items-center justify-center">
+                                        {(event.locationName || event.latitude || event.longitude) && !isCollapsed && (
+                                            <div className="p-5 border-l border-slate-100 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
                                                 <LocationMap location={event.locationName || event.eventType} latitude={event.latitude} longitude={event.longitude} address={event.locationAddress} />
                                             </div>
                                         )}
                                     </div>
 
-                                    <div className="divide-y divide-slate-50">
-                                        {groupBookings.map(categoryGroup => {
-                                            const category = categoryGroup.category || {};
-                                            const isCancelled = categoryGroup.status === 'CANCELLED';
-                                            const totalAmount = categoryGroup.totalAmount;
+                                    {!isCollapsed && (
+                                        <div className="divide-y divide-slate-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                            {groupBookings.map(categoryGroup => {
+                                                const category = categoryGroup.category || {};
+                                                const isCancelled = categoryGroup.status === 'CANCELLED';
+                                                const totalAmount = categoryGroup.totalAmount;
 
-                                            return (
-                                                <div key={categoryGroup.firstBookingId} className="p-4 md:p-5 hover:bg-slate-50/50 transition-colors flex flex-col md:flex-row gap-4 md:items-center justify-between">
-                                                    <div className="flex-1 space-y-1">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-tight ${isCancelled ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700 w-fit'}`}>{categoryGroup.status}</span>
-                                                            <span className="text-[10px] text-slate-400 font-medium">#{categoryGroup.firstBookingId.toString().slice(0, 8).toUpperCase()}</span>
+                                                return (
+                                                    <div key={categoryGroup.firstBookingId} className="p-4 md:p-5 hover:bg-slate-50/50 transition-colors flex flex-col md:flex-row gap-4 md:items-center justify-between">
+                                                        <div className="flex-1 space-y-1">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-tight ${isCancelled ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700 w-fit'}`}>{categoryGroup.status}</span>
+                                                                <span className="text-[10px] text-slate-400 font-medium">#{categoryGroup.firstBookingId.toString().slice(0, 8).toUpperCase()}</span>
+                                                            </div>
+                                                            <div className="flex items-baseline gap-2">
+                                                                <p className="text-sm font-semibold text-slate-700">{categoryGroup.totalSeats} × {category.categoryName}</p>
+                                                                <p className="text-sm font-bold text-slate-900">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(totalAmount)}</p>
+                                                            </div>
+                                                            {categoryGroup.seatLabels && categoryGroup.seatLabels.length > 0 && (
+                                                                <p className="text-[10px] text-slate-500 font-medium">
+                                                                    Seats: {categoryGroup.seatLabels.join(', ')}
+                                                                </p>
+                                                            )}
                                                         </div>
-                                                        <div className="flex items-baseline gap-2">
-                                                            <p className="text-sm font-semibold text-slate-700">{categoryGroup.totalSeats} × {category.categoryName}</p>
-                                                            <p className="text-sm font-bold text-slate-900">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(totalAmount)}</p>
-                                                        </div>
-                                                        {categoryGroup.seatLabels && categoryGroup.seatLabels.length > 0 && (
-                                                            <p className="text-[10px] text-slate-500 font-medium">
-                                                                Seats: {categoryGroup.seatLabels.join(', ')}
-                                                            </p>
+                                                        {!isCancelled && (
+                                                            <div className="flex items-center gap-2 shrink-0">
+                                                                <Button variant="outline" size="sm" onClick={() => navigate(`/ticket/${categoryGroup.firstBookingId}?view=invoice`)} className="h-8 text-xs font-semibold">
+                                                                    <FileText className="w-3 h-3 mr-1" />
+                                                                    Invoice
+                                                                </Button>
+                                                                <Button variant="outline" size="sm" onClick={() => navigate(`/ticket/${categoryGroup.firstBookingId}`)} className="h-8 text-xs font-semibold">Ticket</Button>
+                                                                <Button variant="ghost" size="sm" onClick={(e) => handleEmailTicket(e, categoryGroup.firstBookingId)} disabled={emailingId === categoryGroup.firstBookingId} className="h-8 w-8 p-0" title="Email Ticket">
+                                                                    <Mail className={`w-4 h-4 text-slate-500 ${emailingId === categoryGroup.firstBookingId ? 'animate-pulse text-primary' : ''}`} />
+                                                                </Button>
+                                                            </div>
                                                         )}
                                                     </div>
-                                                    {!isCancelled && (
-                                                        <div className="flex items-center gap-2 shrink-0">
-                                                            <Button variant="outline" size="sm" onClick={() => navigate(`/ticket/${categoryGroup.firstBookingId}?view=invoice`)} className="h-8 text-xs font-semibold">
-                                                                <FileText className="w-3 h-3 mr-1" />
-                                                                Invoice
-                                                            </Button>
-                                                            <Button variant="outline" size="sm" onClick={() => navigate(`/ticket/${categoryGroup.firstBookingId}`)} className="h-8 text-xs font-semibold">Ticket</Button>
-                                                            <Button variant="ghost" size="sm" onClick={(e) => handleEmailTicket(e, categoryGroup.firstBookingId)} disabled={emailingId === categoryGroup.firstBookingId} className="h-8 w-8 p-0" title="Email Ticket">
-                                                                <Mail className={`w-4 h-4 text-slate-500 ${emailingId === categoryGroup.firstBookingId ? 'animate-pulse text-primary' : ''}`} />
-                                                            </Button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}

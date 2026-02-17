@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Ticket, Calendar, MapPin, FileText, User, LogOut, Key, Edit } from 'lucide-react';
+import { Ticket, Calendar, MapPin, FileText, User, LogOut, Key, Edit, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LocationMap } from '@/components/ui/expand-map';
 import { getDefaultEventImage } from '../lib/image-utils';
@@ -13,6 +13,14 @@ const MyBookingsMobile = () => {
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAccountSheet, setShowAccountSheet] = useState(false);
+    const [collapsedIds, setCollapsedIds] = useState({});
+
+    const toggleCollapse = (id) => {
+        setCollapsedIds(prev => ({
+            ...prev,
+            [id]: !prev[id]
+        }));
+    };
 
     useEffect(() => {
         if (!user) {
@@ -204,15 +212,17 @@ const MyBookingsMobile = () => {
                         const { event, bookings: groupBookings } = group;
                         const isAllCancelled = groupBookings.every(b => b.status === 'CANCELLED');
 
+                        const isCollapsed = collapsedIds[event.id];
+
                         return (
-                            <div key={event.id} className={`bg-white rounded-2xl overflow-hidden border ${isAllCancelled ? 'border-slate-100 opacity-60' : 'border-slate-200'}`}>
+                            <div key={event.id} className={`bg-white rounded-2xl overflow-hidden border ${isAllCancelled ? 'border-slate-100 opacity-60' : 'border-slate-200 shadow-sm'}`}>
                                 {/* Event Header - Mobile Optimized */}
-                                <div className="relative">
+                                <div className="relative cursor-pointer group" onClick={() => toggleCollapse(event.id)}>
                                     <div className="aspect-[16/9] md:aspect-[21/9] overflow-hidden">
                                         <img
                                             src={event.imageUrl || getDefaultEventImage(event.eventType)}
                                             alt={event.name}
-                                            className="w-full h-full object-cover"
+                                            className="w-full h-full object-cover group-active:scale-105 transition-transform duration-500"
                                             onError={(e) => {
                                                 const fallback = getDefaultEventImage(event.eventType);
                                                 if (e.target.src !== fallback) {
@@ -221,87 +231,96 @@ const MyBookingsMobile = () => {
                                             }}
                                         />
                                     </div>
-                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                                        <h2 className="text-lg font-bold text-white mb-1">{event.name}</h2>
-                                        <div className="flex items-center gap-3 text-xs text-white/90">
-                                            <div className="flex items-center gap-1">
-                                                <Calendar className="w-3.5 h-3.5" />
-                                                {event.eventDate ? new Date(event.eventDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'TBA'}
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4">
+                                        <div className="flex items-end justify-between">
+                                            <div>
+                                                <h2 className="text-lg font-bold text-white mb-1">{event.name}</h2>
+                                                <div className="flex items-center gap-3 text-[10px] text-white/80 font-medium">
+                                                    <div className="flex items-center gap-1">
+                                                        <Calendar className="w-3 h-3" />
+                                                        {event.eventDate ? new Date(event.eventDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'TBA'}
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <MapPin className="w-3 h-3" />
+                                                        {event.locationName || event.eventType}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-1">
-                                                <MapPin className="w-3.5 h-3.5" />
-                                                {event.locationName || event.eventType}
+                                            <div className="bg-white/10 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white">
+                                                {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                                             </div>
                                         </div>
                                     </div>
                                     {isAllCancelled && (
-                                        <div className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                                        <div className="absolute top-3 right-3 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                                             CANCELLED
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Booking Details - One Per Category */}
-                                <div className="divide-y divide-slate-50">
-                                    {groupBookings.map(categoryGroup => {
-                                        const category = categoryGroup.category || {};
-                                        const isCancelled = categoryGroup.status === 'CANCELLED';
-                                        const totalAmount = categoryGroup.totalAmount;
+                                {!isCollapsed && (
+                                    <div className="divide-y divide-slate-50 animate-in fade-in slide-in-from-top-1 duration-200">
+                                        {groupBookings.map(categoryGroup => {
+                                            const category = categoryGroup.category || {};
+                                            const isCancelled = categoryGroup.status === 'CANCELLED';
+                                            const totalAmount = categoryGroup.totalAmount;
 
-                                        return (
-                                            <div key={categoryGroup.firstBookingId} className="p-4">
-                                                {/* Primary Info */}
-                                                <div className="flex items-start justify-between mb-3">
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${isCancelled ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                                                {categoryGroup.status}
-                                                            </span>
-                                                            <span className="text-[10px] text-slate-400 font-medium">
-                                                                #{categoryGroup.firstBookingId.toString().slice(0, 8).toUpperCase()}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-base font-semibold text-slate-900">
-                                                            {categoryGroup.totalSeats} × {category.categoryName}
-                                                        </p>
-                                                        {categoryGroup.seatLabels && categoryGroup.seatLabels.length > 0 && (
-                                                            <p className="text-xs text-slate-500 mt-0.5">
-                                                                Seats: {categoryGroup.seatLabels.join(', ')}
+                                            return (
+                                                <div key={categoryGroup.firstBookingId} className="p-4">
+                                                    {/* Primary Info */}
+                                                    <div className="flex items-start justify-between mb-3">
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${isCancelled ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                                    {categoryGroup.status}
+                                                                </span>
+                                                                <span className="text-[10px] text-slate-400 font-medium">
+                                                                    #{categoryGroup.firstBookingId.toString().slice(0, 8).toUpperCase()}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-sm font-semibold text-slate-900">
+                                                                {categoryGroup.totalSeats} × {category.categoryName}
                                                             </p>
-                                                        )}
+                                                            {categoryGroup.seatLabels && categoryGroup.seatLabels.length > 0 && (
+                                                                <p className="text-[10px] text-slate-500 mt-0.5">
+                                                                    Seats: {categoryGroup.seatLabels.join(', ')}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-base font-bold text-slate-900">
+                                                                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(totalAmount)}
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <p className="text-lg font-bold text-slate-900">
-                                                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(totalAmount)}
-                                                        </p>
-                                                    </div>
-                                                </div>
 
-                                                {/* Primary Action - Full Width on Mobile */}
-                                                {!isCancelled && (
-                                                    <div className="flex gap-2">
-                                                        <Button
-                                                            onClick={() => navigate(`/ticket/${categoryGroup.firstBookingId}`)}
-                                                            className="flex-1 h-11"
-                                                            size="default"
-                                                        >
-                                                            <Ticket className="w-4 h-4 mr-2" />
-                                                            View Ticket
-                                                        </Button>
-                                                        <Button
-                                                            onClick={() => navigate(`/ticket/${categoryGroup.firstBookingId}?view=invoice`)}
-                                                            variant="outline"
-                                                            className="h-11 px-4"
-                                                            size="default"
-                                                        >
-                                                            <FileText className="w-4 h-4" />
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                                    {/* Primary Action - Full Width on Mobile */}
+                                                    {!isCancelled && (
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                onClick={() => navigate(`/ticket/${categoryGroup.firstBookingId}`)}
+                                                                className="flex-1 h-10 text-xs font-bold"
+                                                                size="sm"
+                                                            >
+                                                                <Ticket className="w-3.5 h-3.5 mr-2" />
+                                                                View Ticket
+                                                            </Button>
+                                                            <Button
+                                                                onClick={() => navigate(`/ticket/${categoryGroup.firstBookingId}?view=invoice`)}
+                                                                variant="outline"
+                                                                className="h-10 px-4 text-xs"
+                                                                size="sm"
+                                                            >
+                                                                <FileText className="w-3.5 h-3.5" />
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         );
                     })
