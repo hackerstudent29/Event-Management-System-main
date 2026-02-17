@@ -56,6 +56,7 @@ const MyBookingsDesktop = () => {
             }
 
             // Group items per transaction/purchase attempt
+            const categoryId = booking.eventCategory?.id || 'unknown';
             const paymentKey = booking.paymentId || booking.id;
             const groupKey = `${categoryId}_${paymentKey}`;
 
