@@ -1,60 +1,51 @@
 package com.eventbooking.service;
 
-import java.util.Objects;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 
-import jakarta.mail.internet.MimeMessage;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @Service
 public class EmailService {
 
-    @Autowired
-    private JavaMailSender mailSender;
+    @Value("${spring.mail.password}")
+    private String apiKey;
 
     @Value("${spring.mail.username}")
     private String senderEmail;
 
-    @Value("${spring.mail.host:smtp-relay.brevo.com}")
-    private String mailHost;
+    private final HttpClient httpClient;
+    private final ObjectMapper objectMapper;
 
-    @Value("${spring.mail.port:587}")
-    private int mailPort;
+    // Remove JavaMailSender to force API usage
+    // private final JavaMailSender mailSender;
 
-    @jakarta.annotation.PostConstruct
-    public void testConnection() {
-        System.out.println("---------- SMTP CONNECTIVITY TEST START ----------");
-        System.out.println("Testing connection to: " + mailHost + ":" + mailPort);
-        try (java.net.Socket socket = new java.net.Socket()) {
-            socket.connect(new java.net.InetSocketAddress(mailHost, mailPort), 5000);
-            System.out.println("SUCCESS: Connected to " + mailHost + ":" + mailPort);
-        } catch (Exception e) {
-            System.err.println("FAILURE: Could not connect to " + mailHost + ":" + mailPort + " - " + e.getMessage());
-        }
-        System.out.println("---------- SMTP CONNECTIVITY TEST END ----------");
+    public EmailService() {
+        this.httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_2)
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+        this.objectMapper = new ObjectMapper();
     }
 
     public void sendHtmlOtp(String to, String otp, String purpose) {
-        // Log OTP to console for development/debugging
         System.out.println("=================================================");
         System.out.println("EMAILING OTP to " + to);
         System.out.println("Purpose: " + purpose);
         System.out.println("OTP: " + otp);
         System.out.println("=================================================");
 
-        // Run asynchronously to prevent blocking the main thread
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
-            // Fix for "Not provider of jakarta.mail.util.StreamProvider" in async threads
-            ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
-            Thread.currentThread().setContextClassLoader(EmailService.class.getClassLoader());
+        CompletableFuture.runAsync(() -> {
             try {
-                MimeMessage message = mailSender.createMimeMessage();
-                MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
                 String subject = "Your OTP";
                 String title = "Security Verification";
                 String bodyText = "Please use the OTP below to continue:";
@@ -68,10 +59,6 @@ public class EmailService {
                     title = "Password Reset Request";
                     bodyText = "You requested to reset your password. Use the secure Code below to proceed. If you didn't request this, please ignore this email.";
                 }
-
-                helper.setFrom(Objects.requireNonNull(senderEmail));
-                helper.setTo(Objects.requireNonNull(to));
-                helper.setSubject(subject);
 
                 String htmlContent = String.format(
                         """
@@ -122,15 +109,6 @@ public class EmailService {
                                                             </table>
                                                         </td>
                                                     </tr>
-
-                                                    <!-- Footer -->
-                                                    <tr>
-                                                        <td style="padding: 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
-                                                            <div style="font-size: 11px; color: #94a3b8;">
-                                                                &copy; 2026 ZENDRUMBOOKING PVT LTD. All rights reserved.
-                                                            </div>
-                                                        </td>
-                                                    </tr>
                                                 </table>
                                             </td>
                                         </tr>
@@ -140,321 +118,188 @@ public class EmailService {
                                 """,
                         title, bodyText, otp);
 
-                helper.setText(Objects.requireNonNull(htmlContent), true);
-
-                System.out.println("Attempting to send email via host: " + mailHost);
-                mailSender.send(message);
-                System.out.println("EMAIL SENT SUCCESSFULLY to " + to);
+                sendBrevoEmail(to, subject, htmlContent);
 
             } catch (Exception e) {
-                System.err.println("FAILED TO SEND EMAIL ASYNC to " + to + ": " + e.getMessage());
-                e.printStackTrace();
-            } finally {
-                Thread.currentThread().setContextClassLoader(originalClassLoader);
-            }
-        }); // End Async
-    }
-
-    public void sendTicketEmail(String to, com.eventbooking.model.Booking booking) {
-        // Run asynchronously
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
-            try {
-                MimeMessage message = mailSender.createMimeMessage();
-                // ... same logic ...
-                MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-                com.eventbooking.model.EventCategory category = booking.getEventCategory();
-                com.eventbooking.model.Event event = category.getEvent();
-
-                // Pricing Math (Standardized Tiered Logic)
-                int qty = booking.getSeatsBooked();
-                double subtotal = category.getPrice().doubleValue() * qty;
-                double convenienceFee = qty > 0 ? (30.00 + Math.max(0, qty - 1) * 15.00) : 0.00;
-                double igstAmount = convenienceFee * 0.18; // Flat 18% on total fee
-                double grandTotal = subtotal + convenienceFee + igstAmount;
-                double totalConvAndTax = convenienceFee + igstAmount;
-
-                java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter
-                        .ofPattern("EEE, dd MMM yyyy");
-                String eventDateStr = event.getEventDate() != null ? event.getEventDate().format(dateFormatter) : "TBD";
-                String bookingIdShort = booking.getId().toString().substring(0, 8).toUpperCase();
-
-                // Generate QR Code URL
-                String qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + booking.getId();
-                // Fallback image
-                String eventImageUrl = "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=600&h=300";
-
-                String subject = "Booking Confirmed! " + event.getName() + " [#" + bookingIdShort + "]";
-
-                helper.setFrom(Objects.requireNonNull(senderEmail));
-                helper.setTo(Objects.requireNonNull(to));
-                helper.setSubject(subject);
-
-                String htmlContent = String.format(
-                        """
-                                <!DOCTYPE html>
-                                <html>
-                                <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: 'Segoe UI', Arial, sans-serif;">
-                                    <table width="100%%" border="0" cellspacing="0" cellpadding="0" style="padding: 40px 0;">
-                                        <tr>
-                                            <td align="center">
-                                                <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">
-                                                    <!-- Header Brand -->
-                                                    <tr>
-                                                        <td align="center" style="padding: 30px 0;">
-                                                            <table border="0" cellspacing="0" cellpadding="0">
-                                                                <tr>
-                                                                    <td style="background-color: #0f172a; color: #ffffff; font-weight: 900; font-size: 16px; padding: 5px 8px; border-radius: 4px;">ZB</td>
-                                                                    <td style="padding-left: 10px; font-size: 20px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px;">ZENDRUMBOOKING</td>
-                                                                </tr>
-                                                            </table>
-                                                        </td>
-                                                    </tr>
-
-                                                    <!-- Success Banner -->
-                                                    <tr>
-                                                        <td align="center" style="background-color: #0f172a; padding: 25px 40px;">
-                                                            <div style="font-size: 18px; font-weight: bold; color: #ffffff; margin-bottom: 4px;">Your order is confirmed!</div>
-                                                            <div style="font-size: 12px; color: #94a3b8;">Booking ID: <span style="color: #ffffff; font-weight: bold;">#%s</span></div>
-                                                        </td>
-                                                    </tr>
-
-                                                    <!-- Event Image -->
-                                                    <tr>
-                                                        <td style="padding: 20px;">
-                                                            <img src="%s" width="560" style="display: block; border-radius: 12px; height: auto;" alt="Event" />
-                                                        </td>
-                                                    </tr>
-
-                                                    <!-- Event Details -->
-                                                    <tr>
-                                                        <td style="padding: 10px 40px 30px 40px;">
-                                                            <div style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 12px;">%s</div>
-                                                            <table width="100%%" border="0" cellspacing="0" cellpadding="0">
-                                                                <tr>
-                                                                    <td width="24" valign="top" style="padding-top: 2px;">📍</td>
-                                                                    <td style="font-size: 14px; color: #475569; padding-left: 8px;">%s, Chennai</td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td style="padding-top: 8px;">🕒</td>
-                                                                    <td style="font-size: 14px; color: #475569; padding-left: 8px; padding-top: 8px;">%s | 06:00 PM</td>
-                                                                </tr>
-                                                            </table>
-                                                        </td>
-                                                    </tr>
-
-                                                    <!-- Order Summary -->
-                                                    <tr>
-                                                        <td style="padding: 0 40px 30px 40px;">
-                                                            <div style="background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px;">
-                                                                <div style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 15px;">Order Summary</div>
-                                                                <table width="100%%" border="0" cellspacing="0" cellpadding="5">
-                                                                    <tr>
-                                                                        <td style="font-size: 13px; color: #475569;">%s (%d Tickets)</td>
-                                                                        <td align="right" style="font-size: 13px; font-weight: 600; color: #1e293b;">Rs. %.2f</td>
-                                                                    </tr>
-                                                                    <tr>
-                                                                <td style="font-size: 13px; color: #64748b;">Conv. Fee & Taxes</td>
-                                                                <td align="right" style="font-size: 13px; color: #64748b;">Rs. %.2f</td>
-                                                            </tr>
-                                                                    <tr style="border-top: 1px solid #e2e8f0;">
-                                                                        <td style="padding-top: 15px; font-size: 16px; font-weight: 800; color: #0f172a;">Total Amount</td>
-                                                                        <td align="right" style="padding-top: 15px; font-size: 16px; font-weight: 900; color: #e11d48;">Rs. %.2f</td>
-                                                                    </tr>
-                                                                </table>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-
-                                                    <!-- QR Entry -->
-                                                    <tr>
-                                                        <td align="center" style="padding-bottom: 40px;">
-                                                            <div style="padding: 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; display: inline-block; margin-bottom: 12px;">
-                                                                <img src="%s" width="140" height="140" alt="QR" />
-                                                            </div>
-                                                            <div style="font-size: 11px; font-weight: 600; color: #64748b;">SCAN TO ENTER AT VENUE</div>
-                                                        </td>
-                                                    </tr>
-
-                                                    <!-- Signature -->
-                                                    <tr>
-                                                        <td style="padding: 0 40px 40px 40px; border-top: 1px solid #f1f5f9; padding-top: 30px;">
-                                                            <div style="font-size: 13px; color: #64748b; margin-bottom: 12px;">Authorized by,</div>
-                                                            <table border="0" cellspacing="0" cellpadding="0">
-                                                                <tr>
-                                                                    <td style="background-color: #0f172a; padding: 10px; border-radius: 4px;">
-                                                                        <div style="color: #ffffff; font-weight: 900; font-size: 14px;">ZB</div>
-                                                                    </td>
-                                                                    <td style="padding-left: 12px;">
-                                                                        <div style="font-size: 11px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">ZENDRUMBOOKING TEAM</div>
-                                                                        <div style="font-size: 10px; color: #94a3b8;">Official Ticketing Partner</div>
-                                                                    </td>
-                                                                </tr>
-                                                            </table>
-                                                        </td>
-                                                    </tr>
-
-                                                    <!-- Footer -->
-                                                    <tr>
-                                                        <td style="background-color: #f8fafc; padding: 25px; text-align: center; border-top: 1px solid #e2e8f0;">
-                                                            <div style="font-size: 11px; color: #94a3b8;">&copy; 2026 ZENDRUMBOOKING PVT LTD.</div>
-                                                        </td>
-                                                    </tr>
-                                                </table>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </body>
-                                </html>
-                                """,
-                        bookingIdShort, eventImageUrl, event.getName(), event.getLocationName(), eventDateStr,
-                        category.getCategoryName(), booking.getSeatsBooked(), subtotal, totalConvAndTax, grandTotal,
-                        qrUrl);
-
-                helper.setText(Objects.requireNonNull(htmlContent), true);
-                mailSender.send(message);
-
-            } catch (Exception e) {
-                System.err.println("FAILED TO SEND TICKET EMAIL: " + e.getMessage());
+                System.err.println("FAILED TO SEND OTP EMAIL API to " + to + ": " + e.getMessage());
                 e.printStackTrace();
             }
         });
     }
 
-    // Overload for backward compatibility
+    public void sendTicketEmail(String to, com.eventbooking.model.Booking booking) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                com.eventbooking.model.EventCategory category = booking.getEventCategory();
+                com.eventbooking.model.Event event = category.getEvent();
+
+                // Pricing Math
+                int qty = booking.getSeatsBooked();
+                double subtotal = category.getPrice().doubleValue() * qty;
+                double convenienceFee = qty > 0 ? (30.00 + Math.max(0, qty - 1) * 15.00) : 0.00;
+                double igstAmount = convenienceFee * 0.18;
+                double grandTotal = subtotal + convenienceFee + igstAmount;
+                double totalConvAndTax = convenienceFee + igstAmount;
+
+                java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter
+                        .ofPattern("EEE, dd MMM yyyy");
+                java.time.format.DateTimeFormatter timeFormatter = java.time.format.DateTimeFormatter
+                        .ofPattern("hh:mm a");
+
+                String eventDate = event.getDate().format(dateFormatter);
+                String eventTime = event.getTime().format(timeFormatter);
+                String bookingIdShort = booking.getId().toString().substring(0, 8).toUpperCase();
+
+                String subject = "Booking Confirmed: " + event.getTitle() + " [#" + bookingIdShort + "]";
+
+                // Images
+                String qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + booking.getId();
+                // This Unsplash image is a placeholder, usually ideally we use
+                // event.getImageUrl() if exists
+                String eventImageUrl = "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=600&h=300";
+
+                String htmlContent = String.format(
+                        """
+                                <html>
+                                <body style="font-family: sans-serif; color: #333;">
+                                    <div style="max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+                                        <div style="background-color: #2563eb; color: white; padding: 20px; text-align: center;">
+                                            <h1 style="margin: 0;">Booking Confirmed!</h1>
+                                            <p style="margin: 5px 0 0 0;">Transaction ID: %s</p>
+                                        </div>
+                                        <div style="padding: 20px;">
+                                            <h2>Hi %s,</h2>
+                                            <p>Your tickets for <strong>%s</strong> are confirmed.</p>
+
+                                            <img src="%s" width="100%%" style="border-radius: 8px; margin-bottom: 20px;" />
+
+                                            <div style="background-color: #f9fafb; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                                                <p><strong>Date:</strong> %s</p>
+                                                <p><strong>Time:</strong> %s</p>
+                                                <p><strong>Venue:</strong> %s</p>
+                                                <p><strong>Category:</strong> %s</p>
+                                                <p><strong>Seats:</strong> %d</p>
+                                            </div>
+
+                                            <h3>Payment Summary</h3>
+                                            <table style="width: 100%%; border-collapse: collapse;">
+                                                <tr>
+                                                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Ticket Price (%d x ₹%.2f)</td>
+                                                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">₹%.2f</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding: 8px 0; border-bottom: 1px solid #eee;">Convenience Fee & Tax</td>
+                                                    <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">₹%.2f</td>
+                                                </tr>
+                                                <tr style="font-weight: bold;">
+                                                    <td style="padding: 12px 0;">Grand Total</td>
+                                                    <td style="padding: 12px 0; text-align: right;">₹%.2f</td>
+                                                </tr>
+                                            </table>
+
+                                            <div style="text-align: center; margin-top: 30px;">
+                                                 <img src="%s" alt="QR Code" style="width: 150px; height: 150px;"/>
+                                                 <p style="font-size: 12px; color: #888;">Scan to Enter</p>
+                                            </div>
+                                        </div>
+                                        <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666;">
+                                            <p>Need help? Contact support@zendrum.com</p>
+                                        </div>
+                                    </div>
+                                </body>
+                                </html>
+                                """,
+                        booking.getTransactionId(),
+                        booking.getUser().getName(),
+                        event.getTitle(),
+                        eventImageUrl,
+                        eventDate,
+                        eventTime,
+                        event.getLocation(),
+                        category.getName(),
+                        qty,
+                        qty, category.getPrice().doubleValue(), subtotal,
+                        totalConvAndTax,
+                        grandTotal,
+                        qrUrl);
+
+                sendBrevoEmail(to, subject, htmlContent);
+
+            } catch (Exception e) {
+                System.err.println("FAILED TO SEND TICKET EMAIL API: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+    }
+
     public void sendHtmlOtp(String to, String otp) {
         sendHtmlOtp(to, otp, "RESET");
     }
 
     public void sendCancellationEmail(String to, com.eventbooking.model.Booking booking, String reason) {
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        CompletableFuture.runAsync(() -> {
+            try {
+                com.eventbooking.model.EventCategory category = booking.getEventCategory();
+                com.eventbooking.model.Event event = category.getEvent();
 
-            com.eventbooking.model.EventCategory category = booking.getEventCategory();
-            com.eventbooking.model.Event event = category.getEvent();
+                int qty = booking.getSeatsBooked();
+                double subtotal = category.getPrice().doubleValue() * qty;
+                double refundAmount = subtotal;
 
-            // Pricing Math for Refund (Standardized Tiered Logic)
-            int qty = booking.getSeatsBooked();
-            double subtotal = category.getPrice().doubleValue() * qty;
-            // Note: Per user rule, refund is ONLY the original ticket price (subtotal)
-            double refundAmount = subtotal;
+                java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter
+                        .ofPattern("EEE, dd MMM yyyy");
+                String eventDateStr = event.getEventDate() != null ? event.getEventDate().format(dateFormatter) : "TBD";
+                String bookingIdShort = booking.getId().toString().substring(0, 8).toUpperCase();
+                String subject = "Event Cancelled: " + event.getName();
 
-            java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter
-                    .ofPattern("EEE, dd MMM yyyy");
-            String eventDateStr = event.getEventDate() != null ? event.getEventDate().format(dateFormatter) : "TBD";
-            String bookingIdShort = booking.getId().toString().substring(0, 8).toUpperCase();
+                String htmlContent = String.format(
+                        "<html><body><h1>Event Cancelled</h1><p>Your booking #%s for %s on %s has been cancelled.</p><p>Reason: %s</p><p>Refund of ₹%.2f initiated.</p></body></html>",
+                        bookingIdShort, event.getName(), eventDateStr, reason, refundAmount);
 
-            String subject = "Event Cancelled: " + event.getName();
-            String cancellationReason = (reason != null && !reason.trim().isEmpty()) ? reason
-                    : "Venue unavailability/Technical issues";
+                sendBrevoEmail(to, subject, htmlContent);
 
-            helper.setFrom(Objects.requireNonNull(senderEmail));
-            helper.setTo(Objects.requireNonNull(to));
-            helper.setSubject(subject);
+            } catch (Exception e) {
+                System.err.println("FAILED TO SEND CANCELLATION EMAIL: " + e.getMessage());
+            }
+        });
+    }
 
-            String htmlContent = String.format(
-                    """
-                            <!DOCTYPE html>
-                            <html>
-                            <body style="margin: 0; padding: 0; background-color: #fef2f2; font-family: 'Segoe UI', Arial, sans-serif;">
-                                <table width="100%%" border="0" cellspacing="0" cellpadding="0" style="padding: 40px 0;">
-                                    <tr>
-                                        <td align="center">
-                                            <table width="550" border="0" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #fee2e2; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-                                                <!-- Header -->
-                                                <tr>
-                                                    <td align="center" style="padding: 40px 40px 10px 40px;">
-                                                        <table border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 20px;">
-                                                            <tr>
-                                                                <td style="background-color: #b91c1c; color: #ffffff; font-weight: 900; font-size: 16px; padding: 5px 8px; border-radius: 4px;">ZB</td>
-                                                                <td style="padding-left: 10px; font-size: 18px; font-weight: 900; color: #334155; letter-spacing: -0.5px;">ZENDRUMBOOKING</td>
-                                                            </tr>
-                                                        </table>
-                                                        <div style="font-size: 26px; font-weight: 800; color: #b91c1c; margin-bottom: 10px;">Event Cancelled</div>
-                                                        <div style="height: 4px; width: 50px; background: #ef4444; border-radius: 2px; margin: 0 auto 20px auto;"></div>
-                                                    </td>
-                                                </tr>
+    private void sendBrevoEmail(String toEmail, String subject, String htmlContent) throws Exception {
+        ObjectNode payload = objectMapper.createObjectNode();
+        ObjectNode sender = payload.putObject("sender");
+        sender.put("name", "Zendrum Booking");
+        sender.put("email", senderEmail); // Must be a verified sender in Brevo
 
-                                                <!-- Main Text -->
-                                                <tr>
-                                                    <td style="padding: 0 45px 30px 45px; text-align: center;">
-                                                        <p style="font-size: 15px; line-height: 1.6; color: #64748b; margin: 0;">
-                                                            We regret to inform you that your upcoming event has been cancelled. Below are the details regarding your booking and refund status.
-                                                        </p>
-                                                    </td>
-                                                </tr>
+        ArrayNode to = payload.putArray("to");
+        ObjectNode recipient = to.addObject();
+        recipient.put("email", toEmail);
 
-                                                <!-- Details Box -->
-                                                <tr>
-                                                    <td style="padding: 0 40px 30px 40px;">
-                                                        <div style="background-color: #f8fafc; border-radius: 12px; padding: 25px; border: 1px solid #e2e8f0;">
-                                                            <div style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 15px;">%s</div>
-                                                            <table width="100%%" border="0" cellspacing="0" cellpadding="2">
-                                                                <tr>
-                                                                    <td style="font-size: 13px; color: #64748b; width: 100px;">Date:</td>
-                                                                    <td style="font-size: 13px; font-weight: 600; color: #334155;">%s</td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td style="font-size: 13px; color: #64748b;">Booking ID:</td>
-                                                                    <td style="font-size: 13px; font-weight: 600; color: #334155;">#%s</td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td style="font-size: 13px; color: #64748b;">Reason:</td>
-                                                                    <td style="font-size: 13px; font-weight: 600; color: #b91c1c;">%s</td>
-                                                                </tr>
-                                                            </table>
-                                                        </div>
-                                                    </td>
-                                                </tr>
+        payload.put("subject", subject);
+        payload.put("htmlContent", htmlContent);
 
-                                                <!-- Refund Info -->
-                                                <tr>
-                                                    <td style="padding: 0 40px 40px 40px;">
-                                                        <div style="border-radius: 12px; border: 2px solid #ecfdf5; background: #f0fdf4; padding: 20px;">
-                                                            <div style="font-size: 14px; font-weight: 800; color: #065f46; margin-bottom: 8px;">Refund Initiated</div>
-                                                            <p style="font-size: 13px; color: #065f46; margin: 0; line-height: 1.5;">
-                                                                A refund of the original ticket price <strong>Rs. %.2f</strong> has been processed to your original payment method. (Convenience fees and taxes are non-refundable). Please allow 5-7 business days for it to reflect in your account.
-                                                            </p>
-                                                        </div>
-                                                    </td>
-                                                </tr>
+        String jsonBody = objectMapper.writeValueAsString(payload);
 
-                                                <!-- Signature -->
-                                                <tr>
-                                                    <td style="padding: 0 40px 40px 40px;">
-                                                        <div style="font-size: 13px; color: #94a3b8; margin-bottom: 15px;">Sincerely,</div>
-                                                        <table border="0" cellspacing="0" cellpadding="0">
-                                                            <tr>
-                                                                <td style="border-left: 3px solid #b91c1c; padding-left: 12px;">
-                                                                    <div style="font-size: 11px; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 1px;">Authorized Signatory</div>
-                                                                    <div style="font-size: 10px; color: #94a3b8;">ZENDRUMBOOKING Corporate Support</div>
-                                                                </td>
-                                                            </tr>
-                                                        </table>
-                                                    </td>
-                                                </tr>
+        // Debug Log
+        System.out.println("Sending Email via Brevo API to: " + toEmail + " with Key suffix: ..."
+                + (apiKey != null && apiKey.length() > 5 ? apiKey.substring(apiKey.length() - 5) : "null"));
 
-                                                <!-- Footer -->
-                                                <tr>
-                                                    <td align="center" style="padding: 25px; background-color: #f8fafc; border-top: 1px solid #f1f5f9;">
-                                                        <div style="font-size: 11px; color: #94a3b8;">ZENDRUMBOOKING PVT LTD</div>
-                                                    </td>
-                                                </tr>
-                                            </table>
-                                        </td>
-                                    </tr>
-                                </table>
-                            </body>
-                            </html>
-                            """,
-                    event.getName(), eventDateStr, bookingIdShort, cancellationReason, refundAmount);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.brevo.com/v3/smtp/email"))
+                .header("api-key", apiKey)
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                .build();
 
-            helper.setText(Objects.requireNonNull(htmlContent), true);
-            mailSender.send(message);
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        } catch (Exception e) {
-            System.err.println("FAILED TO SEND CANCELLATION EMAIL: " + e.getMessage());
+        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+            System.out.println("EMAIL SENT SUCCESSFULLY (API). Response: " + response.body());
+        } else {
+            // System.err is better for failure
+            System.err.println("FAILED Brevo API Response: " + response.statusCode() + " " + response.body());
+            throw new RuntimeException(
+                    "Brevo API failed with status " + response.statusCode() + " Body: " + response.body());
         }
     }
 }
