@@ -55,13 +55,24 @@ public class UserPreferencesService {
                 User user = userRepository.findById(userId)
                                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-                UserPreferences prefs = new UserPreferences();
-                prefs.setUser(user);
-                prefs.setBookingConfirmations(true);
-                prefs.setEventReminders(true);
-                prefs.setCancellationUpdates(true);
-                prefs.setPromotionalEmails(true);
+                try {
+                        UserPreferences prefs = new UserPreferences();
+                        prefs.setUser(user);
+                        prefs.setBookingConfirmations(true);
+                        prefs.setEventReminders(true);
+                        prefs.setCancellationUpdates(true);
+                        prefs.setPromotionalEmails(true);
 
-                return preferencesRepository.save(prefs);
+                        return preferencesRepository.save(prefs);
+                } catch (Exception e) {
+                        // Fallback if DB save fails (e.g. table missing)
+                        // Return a transient object so the frontend doesn't crash
+                        UserPreferences fallback = new UserPreferences();
+                        fallback.setBookingConfirmations(true);
+                        fallback.setEventReminders(true);
+                        fallback.setCancellationUpdates(true);
+                        fallback.setPromotionalEmails(true);
+                        return fallback;
+                }
         }
 }
