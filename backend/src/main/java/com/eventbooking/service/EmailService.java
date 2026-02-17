@@ -217,7 +217,7 @@ public class EmailService {
                                 </body>
                                 </html>
                                 """,
-                        booking.getTransactionId(),
+                        booking.getPaymentId(),
                         userName,
                         event.getName(),
                         eventImageUrl,
