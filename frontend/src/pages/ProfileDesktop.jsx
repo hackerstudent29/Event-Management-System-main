@@ -75,6 +75,7 @@ const ProfileDesktop = () => {
     const [mapZoom, setMapZoom] = useState(13);
 
     const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+    const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
     const [editName, setEditName] = useState('');
     const [editPhone, setEditPhone] = useState('');
     const [editImage, setEditImage] = useState('');
@@ -214,7 +215,6 @@ const ProfileDesktop = () => {
     }
 
     const handleDeleteAccount = async () => {
-        if (!window.confirm("Are you sure you want to delete your account? This action is permanent.")) return;
         try {
             await api.delete(`/users/${user.id}`);
             showMessage("Account deleted successfully", { type: 'success' });
@@ -222,6 +222,8 @@ const ProfileDesktop = () => {
             navigate('/register');
         } catch (err) {
             showMessage("Failed to delete account", { type: 'error' });
+        } finally {
+            setShowDeleteAccountModal(false);
         }
     };
 
@@ -329,6 +331,28 @@ const ProfileDesktop = () => {
                                         <div className="flex gap-3 pt-2"><Button variant="outline" className="flex-1" onClick={closePasswordModal}>Cancel</Button><Button className="flex-1" onClick={handleChangePassword}>Verify & Update</Button></div>
                                     </div>
                                 )}
+                            </motion.div>
+                        </div>
+                    )}
+                    {showDeleteAccountModal && (
+                        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowDeleteAccountModal(false)} />
+                            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white rounded-2xl p-8 shadow-2xl w-full max-w-sm border border-slate-200 text-center">
+                                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-600 mx-auto mb-4">
+                                    <AlertCircle className="w-8 h-8" />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-900 mb-2">Delete Account?</h3>
+                                <p className="text-sm text-slate-500 mb-8 leading-relaxed">
+                                    Are you sure you want to delete your account? This action is permanent and all your bookings will be lost forever.
+                                </p>
+                                <div className="flex flex-col gap-3">
+                                    <Button variant="destructive" className="w-full h-11 font-bold shadow-lg shadow-red-200" onClick={handleDeleteAccount}>
+                                        Yes, Delete Permanently
+                                    </Button>
+                                    <Button variant="ghost" className="w-full text-slate-500" onClick={() => setShowDeleteAccountModal(false)}>
+                                        No, Keep My Account
+                                    </Button>
+                                </div>
                             </motion.div>
                         </div>
                     )}
@@ -783,20 +807,12 @@ const ProfileDesktop = () => {
                                     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                                         <SectionTitle icon={ShieldCheck}>Security & account control</SectionTitle>
                                         <div className="space-y-4">
-                                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-slate-900">Sessions Control</h4>
-                                                    <p className="text-xs text-slate-500">Log out from all other active browser sessions</p>
-                                                </div>
-                                                <Button variant="outline" size="sm" className="h-9 px-4 text-xs font-bold text-slate-700 bg-white shadow-sm">Force Log Out All</Button>
-                                            </div>
-
                                             <div className="flex items-center justify-between p-4 bg-red-50/30 rounded-xl border border-red-100">
                                                 <div>
                                                     <h4 className="text-sm font-bold text-red-900">Permanently Delete Account</h4>
                                                     <p className="text-xs text-red-600/70">Warning: All your bookings and data will be erased forever</p>
                                                 </div>
-                                                <Button variant="ghost" size="sm" className="h-9 px-4 text-xs font-bold text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-200" onClick={handleDeleteAccount}>
+                                                <Button variant="ghost" size="sm" className="h-9 px-4 text-xs font-bold text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-200" onClick={() => setShowDeleteAccountModal(true)}>
                                                     Delete Account
                                                 </Button>
                                             </div>
