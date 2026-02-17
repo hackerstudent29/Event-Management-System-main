@@ -35,7 +35,7 @@ public class UserPreferences {
     private Boolean cancellationUpdates = true;
 
     @Column(name = "promotional_emails", nullable = false)
-    private Boolean promotionalEmails = false;
+    private Boolean promotionalEmails = true;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

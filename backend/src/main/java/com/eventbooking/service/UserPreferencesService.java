@@ -60,7 +60,7 @@ public class UserPreferencesService {
                 prefs.setBookingConfirmations(true);
                 prefs.setEventReminders(true);
                 prefs.setCancellationUpdates(true);
-                prefs.setPromotionalEmails(false);
+                prefs.setPromotionalEmails(true);
 
                 return preferencesRepository.save(prefs);
         }

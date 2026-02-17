@@ -14,8 +14,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import com.eventbooking.repository.UserPreferencesRepository;
+import com.eventbooking.model.UserPreferences;
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class EmailService {
+
+    private final UserPreferencesRepository preferencesRepository;
 
     @Value("${spring.mail.password}")
     private String apiKey;
@@ -23,15 +30,25 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String senderEmail;
 
-    private final HttpClient httpClient;
-    private final ObjectMapper objectMapper;
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_2)
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public EmailService() {
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_2)
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
-        this.objectMapper = new ObjectMapper();
+    private String addEmailFooter(String htmlContent) {
+        String footer = """
+                <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0; margin-top: 40px;">
+                    <p style="font-size: 11px; color: #94a3b8; margin: 0; font-family: sans-serif;">
+                        You received this because of your communication preferences.
+                        <strong>You can turn off these emails via your website settings</strong> at any time.
+                    </p>
+                </div>
+                """;
+        if (htmlContent.contains("</body>")) {
+            return htmlContent.replace("</body>", footer + "</body>");
+        }
+        return htmlContent + footer;
     }
 
     public void sendHtmlOtp(String to, String otp, String purpose) {
@@ -115,7 +132,8 @@ public class EmailService {
                                 """,
                         title, bodyText, otp);
 
-                sendBrevoEmail(to, subject, htmlContent);
+                String finalHtml = addEmailFooter(htmlContent);
+                sendBrevoEmail(to, subject, finalHtml);
 
             } catch (Exception e) {
                 System.err.println("FAILED TO SEND OTP EMAIL API to " + to + ": " + e.getMessage());
@@ -232,7 +250,17 @@ public class EmailService {
                         qrUrl,
                         bookingIdShort);
 
-                sendBrevoEmail(to, subject, htmlContent);
+                // Check preferences
+                if (booking.getUser() != null) {
+                    UserPreferences prefs = preferencesRepository.findByUserId(booking.getUser().getId()).orElse(null);
+                    if (prefs != null && !prefs.getBookingConfirmations()) {
+                        System.out.println("SKIPPING Booking Confirmation Email - User Disabled Preference");
+                        return;
+                    }
+                }
+
+                String finalHtml = addEmailFooter(htmlContent);
+                sendBrevoEmail(to, subject, finalHtml);
 
             } catch (Exception e) {
                 System.err.println("FAILED TO SEND TICKET EMAIL API: " + e.getMessage());
@@ -265,10 +293,59 @@ public class EmailService {
                         "<html><body><h1>Event Cancelled</h1><p>Your booking #%s for %s on %s has been cancelled.</p><p>Reason: %s</p><p>Refund of ₹%.2f initiated.</p></body></html>",
                         bookingIdShort, event.getName(), eventDateStr, reason, refundAmount);
 
-                sendBrevoEmail(to, subject, htmlContent);
+                // Check preferences
+                if (booking.getUser() != null) {
+                    UserPreferences prefs = preferencesRepository.findByUserId(booking.getUser().getId()).orElse(null);
+                    if (prefs != null && !prefs.getCancellationUpdates()) {
+                        System.out.println("SKIPPING Cancellation Email - User Disabled Preference");
+                        return;
+                    }
+                }
+
+                String finalHtml = addEmailFooter(htmlContent);
+                sendBrevoEmail(to, subject, finalHtml);
 
             } catch (Exception e) {
                 System.err.println("FAILED TO SEND CANCELLATION EMAIL: " + e.getMessage());
+            }
+        });
+    }
+
+    public void sendEventPromotionEmail(com.eventbooking.model.User user, com.eventbooking.model.Event event) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                UserPreferences prefs = preferencesRepository.findByUserId(user.getId()).orElse(null);
+                if (prefs != null && !prefs.getPromotionalEmails()) {
+                    System.out.println("SKIPPING Promotional Email - User Disabled Preference: " + user.getEmail());
+                    return;
+                }
+
+                String subject = "New Event Happening! Book Now: " + event.getName();
+                String htmlContent = String.format(
+                        """
+                                <html>
+                                <body style="font-family: sans-serif; color: #333; padding: 20px;">
+                                    <h1 style="color: #e11d48;">New Event Launched!</h1>
+                                    <p>Hi %s,</p>
+                                    <p>A new exciting event <strong>%s</strong> is happening! Don't miss out on the early bird tickets.</p>
+                                    <div style="background: #f1f5f9; padding: 15px; border-radius: 8px;">
+                                        <p><strong>Venue:</strong> %s</p>
+                                        <p><strong>Date:</strong> %s</p>
+                                    </div>
+                                    <p>Book your seats now on our website!</p>
+                                </body>
+                                </html>
+                                """,
+                        user.getName(), event.getName(), event.getLocationName(),
+                        event.getEventDate() != null
+                                ? event.getEventDate().format(
+                                        java.time.format.DateTimeFormatter.ofPattern("EEE, dd MMM yyyy"))
+                                : "TBD");
+
+                String finalHtml = addEmailFooter(htmlContent);
+                sendBrevoEmail(user.getEmail(), subject, finalHtml);
+            } catch (Exception e) {
+                System.err.println("FAILED TO SEND PROMOTIONAL EMAIL: " + e.getMessage());
             }
         });
     }

@@ -25,6 +25,12 @@ public class EventService {
     @Autowired
     private EventCategoryRepository eventCategoryRepository;
 
+    @Autowired
+    private com.eventbooking.repository.UserRepository userRepository;
+
+    @Autowired
+    private EmailService emailService;
+
     public List<Event> getAllEvents() {
         return eventRepository.findAll();
     }
@@ -93,6 +99,18 @@ public class EventService {
             }
         } else {
             initializeCategories(savedEvent);
+        }
+
+        // Send Promotional Emails to all users who have it enabled
+        try {
+            List<com.eventbooking.model.User> allUsers = userRepository.findAll();
+            for (com.eventbooking.model.User user : allUsers) {
+                if (user.getEmail() != null) {
+                    emailService.sendEventPromotionEmail(user, savedEvent);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to broadcast promotional emails: " + e.getMessage());
         }
 
         return savedEvent;
@@ -198,8 +216,7 @@ public class EventService {
         return eventRepository.save(event);
     }
 
-    @Autowired
-    private EmailService emailService;
+    // emailService now autowired at top
 
     public void cancelEvent(@org.springframework.lang.NonNull UUID id, String reason) {
         Event event = getEvent(id);
