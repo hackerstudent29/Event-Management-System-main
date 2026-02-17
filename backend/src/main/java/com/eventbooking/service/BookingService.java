@@ -87,6 +87,14 @@ public class BookingService {
 
         Booking saved = bookingRepository.save(booking);
 
+        // **FIX: Trigger Ticket Email after booking**
+        try {
+            emailService.sendTicketEmail(saved.getUser().getEmail(), saved);
+            System.out.println("Ticket Email sent to: " + saved.getUser().getEmail());
+        } catch (Exception e) {
+            System.err.println("Failed to trigger ticket email: " + e.getMessage());
+        }
+
         // 6. Broadcast Real-time event update to all clients viewing this event
         try {
             UUID eventId = freshCat.getEvent().getId();
@@ -257,13 +265,20 @@ public class BookingService {
         booking.setCheckedInAt(java.time.LocalDateTime.now());
         bookingRepository.save(booking);
 
+        java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy");
+        java.time.format.DateTimeFormatter timeFormatter = java.time.format.DateTimeFormatter.ofPattern("hh:mm a");
+
         return new Dtos.ScanResponse(
                 "VALID",
                 "Entry allowed. Welcome!",
                 booking.getEventCategory().getEvent().getName(),
                 booking.getEventCategory().getCategoryName(),
                 booking.getSeatsBooked(),
-                booking.getUser().getName());
+                booking.getUser().getName(),
+                booking.getSeatIdentifiers(),
+                booking.getEventCategory().getEvent().getLocationName(),
+                booking.getEventCategory().getEvent().getEventDate().format(dateFormatter),
+                booking.getEventCategory().getEvent().getEventDate().format(timeFormatter));
     }
 
     public Dtos.ScanResponse verifyTicket(UUID bookingId) {
@@ -276,13 +291,20 @@ public class BookingService {
         if ("CANCELLED".equals(booking.getStatus()))
             status = "CANCELLED";
 
+        java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy");
+        java.time.format.DateTimeFormatter timeFormatter = java.time.format.DateTimeFormatter.ofPattern("hh:mm a");
+
         return new Dtos.ScanResponse(
                 status,
                 status.equals("VALID") ? "This is a valid ticket." : "Ticket status: " + status,
                 booking.getEventCategory().getEvent().getName(),
                 booking.getEventCategory().getCategoryName(),
                 booking.getSeatsBooked(),
-                booking.getUser().getName());
+                booking.getUser().getName(),
+                booking.getSeatIdentifiers(),
+                booking.getEventCategory().getEvent().getLocationName(),
+                booking.getEventCategory().getEvent().getEventDate().format(dateFormatter),
+                booking.getEventCategory().getEvent().getEventDate().format(timeFormatter));
     }
 
     @Transactional

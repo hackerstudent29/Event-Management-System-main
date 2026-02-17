@@ -111,6 +111,10 @@ public class Dtos {
         private String categoryName;
         private int seats;
         private String userName;
+        private String seatIdentifiers;
+        private String locationName;
+        private String eventDate;
+        private String eventTime;
 
         public ScanResponse(String status, String message) {
             this.status = status;
@@ -125,6 +129,20 @@ public class Dtos {
             this.categoryName = categoryName;
             this.seats = seats;
             this.userName = userName;
+        }
+
+        public ScanResponse(String status, String message, String eventName, String categoryName, int seats,
+                String userName, String seatIdentifiers, String locationName, String eventDate, String eventTime) {
+            this.status = status;
+            this.message = message;
+            this.eventName = eventName;
+            this.categoryName = categoryName;
+            this.seats = seats;
+            this.userName = userName;
+            this.seatIdentifiers = seatIdentifiers;
+            this.locationName = locationName;
+            this.eventDate = eventDate;
+            this.eventTime = eventTime;
         }
     }
 

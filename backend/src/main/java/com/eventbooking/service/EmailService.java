@@ -26,9 +26,6 @@ public class EmailService {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
-    // Remove JavaMailSender to force API usage
-    // private final JavaMailSender mailSender;
-
     public EmailService() {
         this.httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_2)
@@ -154,8 +151,6 @@ public class EmailService {
 
                 // Images
                 String qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + booking.getId();
-                // This Unsplash image is a placeholder, usually ideally we use
-                // event.getImageUrl() if exists
                 String eventImageUrl = "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=600&h=300";
 
                 // Safe user name
@@ -165,6 +160,9 @@ public class EmailService {
                 }
 
                 String location = event.getLocationName() != null ? event.getLocationName() : "Venue TBD";
+                String seatDetails = (booking.getSeatIdentifiers() != null && !booking.getSeatIdentifiers().isEmpty())
+                        ? booking.getSeatIdentifiers()
+                        : qty + " Seat(s)";
 
                 String htmlContent = String.format(
                         """
@@ -186,7 +184,8 @@ public class EmailService {
                                                 <p><strong>Time:</strong> %s</p>
                                                 <p><strong>Venue:</strong> %s</p>
                                                 <p><strong>Category:</strong> %s</p>
-                                                <p><strong>Seats:</strong> %d</p>
+                                                <p><strong>Seats:</strong> <span style="color: #e11d48; font-weight: bold;">%s</span></p>
+                                                <p><strong>Total Quantity:</strong> %d</p>
                                             </div>
 
                                             <h3>Payment Summary</h3>
@@ -207,7 +206,7 @@ public class EmailService {
 
                                             <div style="text-align: center; margin-top: 30px;">
                                                  <img src="%s" alt="QR Code" style="width: 150px; height: 150px;"/>
-                                                 <p style="font-size: 12px; color: #888;">Scan to Enter</p>
+                                                 <p style="font-size: 12px; color: #888;">Scan to Enter - Booking Ref: %s</p>
                                             </div>
                                         </div>
                                         <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #666;">
@@ -225,11 +224,13 @@ public class EmailService {
                         eventTime,
                         location,
                         category.getCategoryName(),
+                        seatDetails,
                         qty,
                         qty, category.getPrice().doubleValue(), subtotal,
                         totalConvAndTax,
                         grandTotal,
-                        qrUrl);
+                        qrUrl,
+                        bookingIdShort);
 
                 sendBrevoEmail(to, subject, htmlContent);
 
