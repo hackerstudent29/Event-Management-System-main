@@ -114,10 +114,16 @@ const MyBookingsDesktop = () => {
             const latestBookingTime = Math.max(...bookingsArray.map(b =>
                 new Date(b.bookingTime || 0).getTime()
             ));
+
+            const eventTotal = bookingsArray.reduce((sum, b) => sum + b.totalAmount, 0);
+            const summaryParts = bookingsArray.map(b => `${b.totalSeats}× ${b.category?.categoryName || 'Standard'}`);
+
             return {
                 event: group.event,
                 bookings: bookingsArray,
-                latestBookingTime: latestBookingTime
+                latestBookingTime: latestBookingTime,
+                eventTotal: eventTotal,
+                eventSummary: summaryParts.join(', ')
             };
         }).sort((a, b) =>
             // Sort by latest booking time - newest bookings first
@@ -208,25 +214,40 @@ const MyBookingsDesktop = () => {
                                             </span>
                                         </div>
                                         <div className="p-5 flex-1 flex flex-col justify-center">
-                                            <div className="flex items-center justify-between">
-                                                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                                    {event.name}
-                                                    {isAllCancelled && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded uppercase">Cancelled</span>}
-                                                </h3>
-                                                <div className="text-slate-400 group-hover/header:text-slate-600 transition-colors">
-                                                    {isCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="flex-1">
+                                                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                                        {event.name}
+                                                        {isAllCancelled && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded uppercase">Cancelled</span>}
+                                                    </h3>
+                                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 mt-1">
+                                                        <div className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 opacity-60" />{event.eventDate ? new Date(event.eventDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBA'}</div>
+                                                        <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 opacity-60" />{event.locationName || event.eventType}</div>
+                                                    </div>
+                                                    {isCollapsed && !isAllCancelled && (
+                                                        <div className="mt-2 flex items-center gap-3 animate-in fade-in duration-500">
+                                                            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                                                                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(group.eventTotal)}
+                                                            </span>
+                                                            <span className="text-[10px] font-medium text-slate-400 truncate max-w-[300px]">
+                                                                {group.eventSummary}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-center gap-4">
+                                                    {(event.locationName || event.latitude || event.longitude) && !isCollapsed && (
+                                                        <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm" onClick={(e) => e.stopPropagation()}>
+                                                            <LocationMap location={event.locationName || event.eventType} latitude={event.latitude} longitude={event.longitude} address={event.locationAddress} />
+                                                        </div>
+                                                    )}
+                                                    <div className="text-slate-300 group-hover/header:text-slate-900 transition-colors bg-slate-100/50 p-2 rounded-full">
+                                                        {isCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 mt-1">
-                                                <div className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 opacity-60" />{event.eventDate ? new Date(event.eventDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBA'}</div>
-                                                <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 opacity-60" />{event.locationName || event.eventType}</div>
-                                            </div>
                                         </div>
-                                        {(event.locationName || event.latitude || event.longitude) && !isCollapsed && (
-                                            <div className="p-5 border-l border-slate-100 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-                                                <LocationMap location={event.locationName || event.eventType} latitude={event.latitude} longitude={event.longitude} address={event.locationAddress} />
-                                            </div>
-                                        )}
                                     </div>
 
                                     {!isCollapsed && (

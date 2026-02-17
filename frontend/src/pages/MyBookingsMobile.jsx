@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Ticket, Calendar, MapPin, FileText, User, LogOut, Key, Edit, ChevronDown, ChevronUp } from 'lucide-react';
+import { Ticket, Calendar, MapPin, FileText, User, LogOut, Key, Edit, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LocationMap } from '@/components/ui/expand-map';
 import { getDefaultEventImage } from '../lib/image-utils';
@@ -110,10 +110,16 @@ const MyBookingsMobile = () => {
             const latestBookingTime = Math.max(...bookingsArray.map(b =>
                 new Date(b.bookingTime || 0).getTime()
             ));
+
+            const eventTotal = bookingsArray.reduce((sum, b) => sum + b.totalAmount, 0);
+            const summaryParts = bookingsArray.map(b => `${b.totalSeats}× ${b.category?.categoryName || 'S'}`);
+
             return {
                 event: group.event,
                 bookings: bookingsArray,
-                latestBookingTime: latestBookingTime
+                latestBookingTime: latestBookingTime,
+                eventTotal: eventTotal,
+                eventSummary: summaryParts.join(', ')
             };
         }).sort((a, b) =>
             b.latestBookingTime - a.latestBookingTime
@@ -231,11 +237,11 @@ const MyBookingsMobile = () => {
                                             }}
                                         />
                                     </div>
-                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4">
-                                        <div className="flex items-end justify-between">
-                                            <div>
-                                                <h2 className="text-lg font-bold text-white mb-1">{event.name}</h2>
-                                                <div className="flex items-center gap-3 text-[10px] text-white/80 font-medium">
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent p-4">
+                                        <div className="flex items-end justify-between gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <h2 className="text-lg font-bold text-white mb-1 truncate">{event.name}</h2>
+                                                <div className="flex items-center gap-3 text-[10px] text-white/80 font-medium mb-1">
                                                     <div className="flex items-center gap-1">
                                                         <Calendar className="w-3 h-3" />
                                                         {event.eventDate ? new Date(event.eventDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'TBA'}
@@ -245,9 +251,19 @@ const MyBookingsMobile = () => {
                                                         {event.locationName || event.eventType}
                                                     </div>
                                                 </div>
+                                                {isCollapsed && !isAllCancelled && (
+                                                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-500">
+                                                        <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(group.eventTotal)}
+                                                        </span>
+                                                        <span className="text-[9px] font-medium text-white/60 truncate italic">
+                                                            {group.eventSummary}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className="bg-white/10 backdrop-blur-md p-1.5 rounded-full border border-white/10 text-white">
-                                                {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                                            <div className="bg-white/10 backdrop-blur-md p-2 rounded-full border border-white/20 text-white shadow-lg shrink-0">
+                                                {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                             </div>
                                         </div>
                                     </div>
