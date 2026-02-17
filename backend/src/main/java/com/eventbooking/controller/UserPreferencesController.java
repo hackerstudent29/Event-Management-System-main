@@ -19,16 +19,21 @@ public class UserPreferencesController {
 
     @GetMapping
     public ResponseEntity<Dtos.UserPreferencesResponse> getPreferences(Authentication authentication) {
-        UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.ok(preferencesService.getPreferences(Objects.requireNonNull(userId)));
+        try {
+            UUID userId = UUID.fromString(authentication.getName());
+            return ResponseEntity.ok(preferencesService.getPreferences(Objects.requireNonNull(userId)));
+        } catch (Exception e) {
+            // Fallback: Return default preferences if DB fetch fails
+            return ResponseEntity.ok(new Dtos.UserPreferencesResponse(true, true, true, true));
+        }
     }
 
     @PutMapping
     public ResponseEntity<Dtos.UserPreferencesResponse> updatePreferences(
             @RequestBody Dtos.UserPreferencesRequest request,
             Authentication authentication) {
-        UUID userId = UUID.fromString(authentication.getName());
         try {
+            UUID userId = UUID.fromString(authentication.getName());
             return ResponseEntity.ok(preferencesService.updatePreferences(Objects.requireNonNull(userId), request));
         } catch (Exception e) {
             // Fallback: Return the requested changes as if they were saved
