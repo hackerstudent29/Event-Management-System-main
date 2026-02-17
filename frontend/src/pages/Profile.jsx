@@ -47,6 +47,45 @@ const StatCard = ({ label, value, icon: Icon, colorClass }) => (
 );
 
 
+const Pagination = ({ totalItems, itemsPerPage, currentPage, onPageChange }) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    if (totalPages <= 1) return null;
+
+    return (
+        <div className="flex items-center justify-center gap-2 mt-8 pb-4">
+            <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+            >
+                <ChevronRight className="w-4 h-4 rotate-180" />
+            </Button>
+            {Array.from({ length: totalPages }).map((_, i) => (
+                <Button
+                    key={i}
+                    variant={currentPage === i + 1 ? "default" : "outline"}
+                    size="sm"
+                    className={cn("h-8 w-8 p-0 font-bold text-xs", currentPage === i + 1 ? "bg-slate-900 text-white" : "text-slate-500")}
+                    onClick={() => onPageChange(i + 1)}
+                >
+                    {i + 1}
+                </Button>
+            ))}
+            <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+            >
+                <ChevronRight className="w-4 h-4" />
+            </Button>
+        </div>
+    );
+};
+
 const Profile = () => {
     const { user, logout, updateUser } = useAuth();
     const navigate = useNavigate();
@@ -60,6 +99,15 @@ const Profile = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('bookings'); // bookings, payments, locations, settings
     const [bookingFilter, setBookingFilter] = useState('all'); // all, confirmed, cancelled
+    const [bookingsPage, setBookingsPage] = useState(1);
+    const [paymentsPage, setPaymentsPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
+    const [preferences, setPreferences] = useState({
+        bookingConfirmations: true,
+        eventReminders: true,
+        cancellationUpdates: true,
+        promotionalEmails: true
+    });
 
     // Feature States
     const [showAddLocationModal, setShowAddLocationModal] = useState(false);
@@ -115,6 +163,15 @@ const Profile = () => {
     const [otpSent, setOtpSent] = useState(false);
     const [newPassword, setNewPassword] = useState('');
 
+    const fetchPreferences = useCallback(async () => {
+        try {
+            const res = await api.get('/user/preferences');
+            setPreferences(res.data);
+        } catch (error) {
+            console.error('Failed to fetch preferences');
+        }
+    }, []);
+
     const fetchData = useCallback(async () => {
         try {
             const [userRes, statsRes, bookingsRes, locationsRes] = await Promise.all([
@@ -127,6 +184,7 @@ const Profile = () => {
             setStats(statsRes.data);
             setBookings(bookingsRes.data);
             setLocations(locationsRes.data);
+            fetchPreferences();
 
             // Pre-fill edit form
             setEditName(userRes.data.name || '');
@@ -156,6 +214,18 @@ const Profile = () => {
         // Sort by booking time - newest first
         return filtered.sort((a, b) => new Date(b.bookingTime || 0) - new Date(a.bookingTime || 0));
     }, [bookings, bookingFilter]);
+
+    const paginatedBookings = useMemo(() => {
+        const start = (bookingsPage - 1) * ITEMS_PER_PAGE;
+        return filteredBookings.slice(start, start + ITEMS_PER_PAGE);
+    }, [filteredBookings, bookingsPage]);
+
+    const paginatedPayments = useMemo(() => {
+        // We use all bookings for payments tab as well
+        const start = (paymentsPage - 1) * ITEMS_PER_PAGE;
+        const sorted = [...bookings].sort((a, b) => new Date(b.bookingTime || 0) - new Date(a.bookingTime || 0));
+        return sorted.slice(start, start + ITEMS_PER_PAGE);
+    }, [bookings, paymentsPage]);
 
     const handleUpdateProfile = async () => {
         try {
@@ -269,6 +339,18 @@ const Profile = () => {
     const handleLocationSelect = (coords) => {
         setNewLocationLat(coords.latitude);
         setNewLocationLng(coords.longitude);
+    };
+
+    const handlePreferenceChange = async (key, value) => {
+        const newPreferences = { ...preferences, [key]: value };
+        setPreferences(newPreferences);
+        try {
+            await api.put('/user/preferences', newPreferences);
+        } catch (error) {
+            // Revert on error
+            setPreferences(preferences);
+            showMessage("Failed to update preference", { type: 'error' });
+        }
     };
 
     const handleDeleteLocation = async (id) => {
@@ -595,13 +677,13 @@ const Profile = () => {
                                     </div>
 
                                     <div className="grid grid-cols-1 gap-4">
-                                        {filteredBookings.length === 0 ? (
+                                        {paginatedBookings.length === 0 ? (
                                             <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-20 text-center">
                                                 <Ticket className="w-12 h-12 text-slate-200 mx-auto mb-4" />
                                                 <p className="text-slate-500 font-medium">No bookings found in this category.</p>
                                             </div>
                                         ) : (
-                                            filteredBookings.map(booking => (
+                                            paginatedBookings.map(booking => (
                                                 <div key={booking.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group">
                                                     <div className="flex flex-col md:flex-row justify-between gap-4">
                                                         <div className="flex gap-4">
@@ -656,6 +738,12 @@ const Profile = () => {
                                                 </div>
                                             ))
                                         )}
+                                        <Pagination
+                                            totalItems={filteredBookings.length}
+                                            itemsPerPage={ITEMS_PER_PAGE}
+                                            currentPage={bookingsPage}
+                                            onPageChange={setBookingsPage}
+                                        />
                                     </div>
                                 </motion.div>
                             )}
@@ -683,7 +771,7 @@ const Profile = () => {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
-                                                {bookings.map(booking => (
+                                                {paginatedPayments.map(booking => (
                                                     <tr key={booking.id} className="hover:bg-slate-50/30 transition-colors">
                                                         <td className="px-6 py-4 text-sm text-slate-600 font-medium">
                                                             {booking.bookingTime ? new Date(booking.bookingTime).toLocaleDateString() : 'N/A'}
@@ -692,7 +780,7 @@ const Profile = () => {
                                                             #{booking.id.toString().slice(0, 8).toUpperCase()}
                                                         </td>
                                                         <td className="px-6 py-4 text-sm font-bold text-slate-900">
-                                                            ₹{((booking.seatsBooked * booking.eventCategory?.price) + 35.40).toLocaleString()}
+                                                            ₹{((booking.seatsBooked * (booking.eventCategory?.price || 0)) + 35.40).toLocaleString()}
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center gap-1.5">
@@ -712,6 +800,12 @@ const Profile = () => {
                                             </tbody>
                                         </table>
                                     </div>
+                                    <Pagination
+                                        totalItems={bookings.length}
+                                        itemsPerPage={ITEMS_PER_PAGE}
+                                        currentPage={paymentsPage}
+                                        onPageChange={setPaymentsPage}
+                                    />
                                 </motion.div>
                             )}
 
@@ -795,20 +889,59 @@ const Profile = () => {
                                     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                                         <SectionTitle icon={Bell}>Communication Preferences</SectionTitle>
                                         <div className="space-y-4">
-                                            {[
-                                                { id: 'conf', title: 'Booking Confirmations', desc: 'Get SMS & Email when you book an event' },
-                                                { id: 'rem', title: 'Event Reminders', desc: 'Receive alerts 24h before your event starts' },
-                                                { id: 'canc', title: 'Cancellation Updates', desc: 'Immediate alerts if an event is postponed or cancelled' },
-                                                { id: 'promo', title: 'Promotional Emails', desc: 'New events, discounts and curated recommendations' }
-                                            ].map(pref => (
-                                                <div key={pref.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors">
-                                                    <div>
-                                                        <h4 className="text-sm font-bold text-slate-900">{pref.title}</h4>
-                                                        <p className="text-xs text-slate-500">{pref.desc}</p>
-                                                    </div>
-                                                    <input type="checkbox" defaultChecked className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary h-5 w-5" />
+                                            <div className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors">
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-slate-900">Booking Confirmations</h4>
+                                                    <p className="text-xs text-slate-500">Get SMS & Email when you book an event</p>
                                                 </div>
-                                            ))}
+                                                <input
+                                                    type="checkbox"
+                                                    checked={preferences.bookingConfirmations}
+                                                    onChange={(e) => handlePreferenceChange('bookingConfirmations', e.target.checked)}
+                                                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary h-5 w-5"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors">
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-slate-900">Event Reminders</h4>
+                                                    <p className="text-xs text-slate-500">Receive alerts 24h before your event starts</p>
+                                                </div>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={preferences.eventReminders}
+                                                    onChange={(e) => handlePreferenceChange('eventReminders', e.target.checked)}
+                                                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary h-5 w-5"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors">
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-slate-900">Cancellation Updates</h4>
+                                                    <p className="text-xs text-slate-500">Immediate alerts if an event is postponed or cancelled</p>
+                                                </div>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={preferences.cancellationUpdates}
+                                                    onChange={(e) => handlePreferenceChange('cancellationUpdates', e.target.checked)}
+                                                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary h-5 w-5"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors">
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-slate-900">Promotional Emails</h4>
+                                                    <p className="text-xs text-slate-500">New events, discounts and curated recommendations</p>
+                                                </div>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={preferences.promotionalEmails}
+                                                    onChange={(e) => handlePreferenceChange('promotionalEmails', e.target.checked)}
+                                                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary h-5 w-5"
+                                                />
+                                            </div>
+                                            <div className="mt-4 pt-4 border-t border-slate-100">
+                                                <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">
+                                                    * You can turn off these notifications at any time. Required transactional alerts like security OTPs will still be sent for your safety.
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
 
