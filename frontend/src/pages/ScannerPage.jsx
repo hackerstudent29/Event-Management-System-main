@@ -1,3 +1,4 @@
+// Redeploy Trigger: Premium Scanner UI Update
 import React, { useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import api from '../api/axios';
