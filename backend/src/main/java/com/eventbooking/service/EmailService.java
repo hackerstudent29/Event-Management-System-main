@@ -146,17 +146,25 @@ public class EmailService {
                 java.time.format.DateTimeFormatter timeFormatter = java.time.format.DateTimeFormatter
                         .ofPattern("hh:mm a");
 
-                String eventDate = event.getDate().format(dateFormatter);
-                String eventTime = event.getTime().format(timeFormatter);
+                String eventDate = event.getEventDate() != null ? event.getEventDate().format(dateFormatter) : "TBD";
+                String eventTime = event.getEventDate() != null ? event.getEventDate().format(timeFormatter) : "TBD";
                 String bookingIdShort = booking.getId().toString().substring(0, 8).toUpperCase();
 
-                String subject = "Booking Confirmed: " + event.getTitle() + " [#" + bookingIdShort + "]";
+                String subject = "Booking Confirmed: " + event.getName() + " [#" + bookingIdShort + "]";
 
                 // Images
                 String qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + booking.getId();
                 // This Unsplash image is a placeholder, usually ideally we use
                 // event.getImageUrl() if exists
                 String eventImageUrl = "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=600&h=300";
+
+                // Safe user name
+                String userName = "Valued Customer";
+                if (booking.getUser() != null && booking.getUser().getName() != null) {
+                    userName = booking.getUser().getName();
+                }
+
+                String location = event.getLocationName() != null ? event.getLocationName() : "Venue TBD";
 
                 String htmlContent = String.format(
                         """
@@ -210,13 +218,13 @@ public class EmailService {
                                 </html>
                                 """,
                         booking.getTransactionId(),
-                        booking.getUser().getName(),
-                        event.getTitle(),
+                        userName,
+                        event.getName(),
                         eventImageUrl,
                         eventDate,
                         eventTime,
-                        event.getLocation(),
-                        category.getName(),
+                        location,
+                        category.getCategoryName(),
                         qty,
                         qty, category.getPrice().doubleValue(), subtotal,
                         totalConvAndTax,
