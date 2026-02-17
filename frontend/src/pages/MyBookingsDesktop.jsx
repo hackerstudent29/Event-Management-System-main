@@ -55,9 +55,12 @@ const MyBookingsDesktop = () => {
                 };
             }
 
-            const categoryId = booking.eventCategory?.id || 'unknown';
-            if (!groups[event.id].bookingsByCategory[categoryId]) {
-                groups[event.id].bookingsByCategory[categoryId] = {
+            // Group items per transaction/purchase attempt
+            const paymentKey = booking.paymentId || booking.id;
+            const groupKey = `${categoryId}_${paymentKey}`;
+
+            if (!groups[event.id].bookingsByCategory[groupKey]) {
+                groups[event.id].bookingsByCategory[groupKey] = {
                     category: booking.eventCategory,
                     bookings: [],
                     totalSeats: 0,

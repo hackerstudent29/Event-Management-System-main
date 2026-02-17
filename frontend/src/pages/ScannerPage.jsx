@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import api from '../api/axios';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, XCircle, AlertTriangle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, ArrowLeft, RefreshCw, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const ScannerPage = () => {
@@ -75,13 +75,41 @@ const ScannerPage = () => {
                     {result.eventName && (
                         <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 text-left border border-white/20">
                             <h2 className="text-xs font-black uppercase tracking-widest opacity-60 mb-4">Ticket Details</h2>
-                            <div className="space-y-3">
-                                <p className="text-lg font-bold">{result.eventName}</p>
-                                <div className="flex justify-between text-sm font-semibold opacity-80">
-                                    <span>{result.categoryName}</span>
-                                    <span>{result.seats} Seats</span>
+                            <div className="space-y-4">
+                                <div>
+                                    <p className="text-xl font-bold leading-tight mb-1">{result.eventName}</p>
+                                    <div className="flex items-center gap-2 text-xs font-bold opacity-70">
+                                        <MapPin className="w-3 h-3" />
+                                        <span>{result.locationName}</span>
+                                    </div>
                                 </div>
-                                <p className="text-sm font-bold pt-2 border-t border-white/10">Guest: {result.userName}</p>
+
+                                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-50">Date & Time</p>
+                                        <p className="text-sm font-bold">{result.eventDate}</p>
+                                        <p className="text-xs font-semibold opacity-70">{result.eventTime}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-50">Category</p>
+                                        <p className="text-sm font-bold">{result.categoryName}</p>
+                                        <p className="text-xs font-semibold opacity-70">{result.seats} Seats</p>
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 border-t border-white/10">
+                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1">Seats</p>
+                                    <p className="text-lg font-black text-amber-300 drop-shadow-sm">
+                                        {result.seatIdentifiers || `Generic x${result.seats}`}
+                                    </p>
+                                </div>
+
+                                <p className="text-sm font-bold pt-4 border-t border-white/10 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-[10px]">
+                                        {result.userName?.charAt(0)}
+                                    </div>
+                                    Guest: {result.userName}
+                                </p>
                             </div>
                         </div>
                     )}
