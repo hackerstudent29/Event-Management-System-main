@@ -32,6 +32,9 @@ public class EmailService {
 
         // Run asynchronously to prevent blocking the main thread
         java.util.concurrent.CompletableFuture.runAsync(() -> {
+            // Fix for "Not provider of jakarta.mail.util.StreamProvider" in async threads
+            ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
+            Thread.currentThread().setContextClassLoader(EmailService.class.getClassLoader());
             try {
                 MimeMessage message = mailSender.createMimeMessage();
                 MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -130,6 +133,8 @@ public class EmailService {
             } catch (Exception e) {
                 System.err.println("FAILED TO SEND EMAIL ASYNC to " + to + ": " + e.getMessage());
                 e.printStackTrace();
+            } finally {
+                Thread.currentThread().setContextClassLoader(originalClassLoader);
             }
         }); // End Async
     }
