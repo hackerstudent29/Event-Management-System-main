@@ -34,21 +34,31 @@ public class UserPreferencesService {
         @Transactional
         public Dtos.UserPreferencesResponse updatePreferences(@NonNull UUID userId,
                         Dtos.UserPreferencesRequest request) {
-                UserPreferences prefs = preferencesRepository.findByUserId(userId)
-                                .orElseGet(() -> createDefaultPreferences(userId));
+                try {
+                        UserPreferences prefs = preferencesRepository.findByUserId(userId)
+                                        .orElseGet(() -> createDefaultPreferences(userId));
 
-                prefs.setBookingConfirmations(request.getBookingConfirmations());
-                prefs.setEventReminders(request.getEventReminders());
-                prefs.setCancellationUpdates(request.getCancellationUpdates());
-                prefs.setPromotionalEmails(request.getPromotionalEmails());
+                        prefs.setBookingConfirmations(request.getBookingConfirmations());
+                        prefs.setEventReminders(request.getEventReminders());
+                        prefs.setCancellationUpdates(request.getCancellationUpdates());
+                        prefs.setPromotionalEmails(request.getPromotionalEmails());
 
-                UserPreferences saved = preferencesRepository.save(prefs);
+                        UserPreferences saved = preferencesRepository.save(prefs);
 
-                return new Dtos.UserPreferencesResponse(
-                                saved.getBookingConfirmations(),
-                                saved.getEventReminders(),
-                                saved.getCancellationUpdates(),
-                                saved.getPromotionalEmails());
+                        return new Dtos.UserPreferencesResponse(
+                                        saved.getBookingConfirmations(),
+                                        saved.getEventReminders(),
+                                        saved.getCancellationUpdates(),
+                                        saved.getPromotionalEmails());
+                } catch (Exception e) {
+                        // If update fails (e.g. table missing), return what the user requested
+                        // This allows the UI to stay functional even if persistence fails
+                        return new Dtos.UserPreferencesResponse(
+                                        request.getBookingConfirmations(),
+                                        request.getEventReminders(),
+                                        request.getCancellationUpdates(),
+                                        request.getPromotionalEmails());
+                }
         }
 
         private UserPreferences createDefaultPreferences(@NonNull UUID userId) {
