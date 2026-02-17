@@ -19,6 +19,9 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String senderEmail;
 
+    @Value("${spring.mail.host}")
+    private String mailHost;
+
     public void sendHtmlOtp(String to, String otp, String purpose) {
         // Log OTP to console for development/debugging
         System.out.println("=================================================");
@@ -120,8 +123,7 @@ public class EmailService {
 
                 helper.setText(Objects.requireNonNull(htmlContent), true);
 
-                System.out.println("Attempting to send email via host: "
-                        + System.getProperty("spring.mail.host", "configured-host"));
+                System.out.println("Attempting to send email via host: " + mailHost);
                 mailSender.send(message);
                 System.out.println("EMAIL SENT SUCCESSFULLY to " + to);
 
