@@ -72,7 +72,7 @@ const MyBookingsMobile = () => {
                 };
             }
 
-            const categoryGroup = groups[event.id].bookingsByCategory[categoryId];
+            const categoryGroup = groups[event.id].bookingsByCategory[groupKey];
             categoryGroup.bookings.push(booking);
             categoryGroup.totalSeats += (booking.seatsBooked || 0);
 
